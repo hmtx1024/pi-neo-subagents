@@ -1,6 +1,6 @@
 {
   "name": "pi-neo-subagents",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Subagents for Pi: define Markdown agent definitions and delegate tasks to isolated nested agent sessions",
   "type": "module",
   "license": "MIT",
@@ -19,6 +19,7 @@
   "files": [
     "index.ts",
     "src",
+    "README.zh-CN.md",
     "CHANGELOG.md"
   ],
   "keywords": [

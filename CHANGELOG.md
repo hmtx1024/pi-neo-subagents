@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] — 2026-10-25
+
+Documentation only; no behaviour changes.
+
+### Added
+
+- `README.zh-CN.md`, a Simplified Chinese mirror of the README, with a language
+  switcher at the top of both files. It now ships inside the package as well.
+
 ## [0.1.2] — 2026-10-25
 
 Corrects the declared Node floor and adds continuous integration.
