@@ -22,7 +22,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        node: [20, 22]
+        node: [22, 24]
 
     steps:
       - uses: actions/checkout@v4
@@ -32,6 +32,9 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
 
+      # Node 22 is the floor: the host SDK (pi-coding-agent) declares
+      # engines.node >=22.19.0. Node 24 is what development runs on.
+      #
       # The suite is hermetic: it drives in-memory sessions against a scripted
       # fake model, so it needs no credentials, no network, and costs nothing.
       # The live-model suite (test/live) is excluded from `npm test` and never

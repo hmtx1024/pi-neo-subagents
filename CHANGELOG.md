@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] — 2026-10-25
+
+Corrects the declared Node floor and adds continuous integration.
+
+### Added
+
+- GitHub Actions workflow: `npm ci`, typecheck, and the hermetic suite on Node 22
+  and 24 across Linux and Windows, with a build-status badge in the README. The
+  suite needs no credentials and costs nothing, because it drives in-memory
+  sessions against a scripted fake model.
+
+### Fixed
+
+- `engines.node` claimed `>=20`, but the Pi host SDK requires `>=22.19.0`: on
+  Node 20 every test file fails to load (`fs.globSync` does not exist there).
+  The floor now matches the host.
+
 ## [0.1.1] — 2026-10-25
 
 Packaging metadata only; no behaviour changes.

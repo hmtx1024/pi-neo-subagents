@@ -309,6 +309,8 @@ dialog UI, `"ask"` proceeds (automation never hangs) while `"deny"` refuses.
 
 ## Development
 
+Requires Node 22.19 or newer — the floor declared by the Pi host SDK.
+
 ```bash
 npm ci          # installs from the committed lockfile
 npm test        # vitest, hermetic: scripted fake model, no network
