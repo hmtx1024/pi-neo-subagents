@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/hmtx1024/pi-neo-subagents/actions/workflows/ci.yml/badge.svg)](https://github.com/hmtx1024/pi-neo-subagents/actions/workflows/ci.yml)
 
+**English** · [简体中文](README.zh-CN.md)
+
 Subagents for [Pi](https://github.com/earendil-works/pi): define named specialist
 agents as Markdown files, then let the main agent delegate self-contained tasks
 to them — or run them yourself. Each delegation runs in an isolated nested
