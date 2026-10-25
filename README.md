@@ -308,7 +308,7 @@ dialog UI, `"ask"` proceeds (automation never hangs) while `"deny"` refuses.
 ## Development
 
 ```bash
-npm install
+npm ci          # installs from the committed lockfile
 npm test        # vitest, hermetic: scripted fake model, no network
 npm run typecheck
 npm run test:live   # live-model smoke suite (real provider, real cost)
@@ -330,3 +330,13 @@ from it and runs only through `npm run test:live`, which enables it with
 Tests drive full in-memory agent sessions through the Pi SDK with pi-ai's
 `fauxProvider` as the scripted model; behaviour is asserted only at the
 session boundary (tool results, visible messages, recorded UI output).
+
+Repository layout:
+
+| Path | Contents |
+|---|---|
+| `index.ts`, `src/` | the extension itself — everything that ships to npm |
+| `test/` | hermetic suite; `test/live/` is the opt-in live suite |
+| `docs/specs/` | behaviour specifications, current and superseded |
+| `docs/history/` | design records: the tickets each version came from, and the real-model test report |
+| `scripts/manual-test/` | RPC driver and fixtures for scripted end-to-end runs against a real `pi` process |

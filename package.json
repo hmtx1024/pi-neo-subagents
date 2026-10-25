@@ -1,10 +1,18 @@
 {
   "name": "pi-neo-subagents",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Subagents for Pi: define Markdown agent definitions and delegate tasks to isolated nested agent sessions",
   "type": "module",
   "license": "MIT",
   "author": "灰木同学 <hmtx1024@outlook.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hmtx1024/pi-neo-subagents.git"
+  },
+  "homepage": "https://github.com/hmtx1024/pi-neo-subagents#readme",
+  "bugs": {
+    "url": "https://github.com/hmtx1024/pi-neo-subagents/issues"
+  },
   "engines": {
     "node": ">=20"
   },

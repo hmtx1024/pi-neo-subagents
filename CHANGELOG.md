@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] — 2026-10-25
+
+Packaging metadata only; no behaviour changes.
+
+### Added
+
+- `repository`, `homepage`, and `bugs` pointing at the source repository, so the
+  npm page links to the code and to the issue tracker.
+
+### Changed
+
+- Development dependency `vitest` pinned to `^4`. Under `vitest` 5, a fresh
+  clone could not install rolldown's optional native binding through
+  `npm ci` ([npm/cli#4828]), which broke `npm test` on a clean checkout.
+- `package-lock.json` regenerated at the same resolved versions.
+
+[npm/cli#4828]: https://github.com/npm/cli/issues/4828
+
 ## [0.1.0] — 2026-10-24
 
 First public release. Covers the v1 delegation core and the v2 governance work.
