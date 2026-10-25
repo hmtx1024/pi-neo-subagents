@@ -1,0 +1,19 @@
+# Normalize line endings: the repository stores LF, checkouts match the platform.
+* text=auto eol=lf
+
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.mjs   text eol=lf
+*.js    text eol=lf
+*.json  text eol=lf
+*.jsonc text eol=lf
+*.md    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+
+# Binary: never diff or convert these.
+*.tgz   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.ico   binary

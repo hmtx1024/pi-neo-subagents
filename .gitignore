@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Build and packaging output
+*.tgz
+coverage/
+dist/
+.vitest/
+
+# Local scratch area: active notes, logs, throwaway probes.
+# Durable records are archived under docs/history/ and are tracked.
+.scratch/
+
+# npm / credentials — never commit these
+.npmrc
+.npmrc.*
+auth.json
+*.pem
+*.key
+*.p12
+id_rsa*
+npm-debug.log*
+*-debug.log
+*.log
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Editors and OS cruft
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

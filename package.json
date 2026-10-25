@@ -1,0 +1,44 @@
+{
+  "name": "pi-neo-subagents",
+  "version": "0.1.0",
+  "description": "Subagents for Pi: define Markdown agent definitions and delegate tasks to isolated nested agent sessions",
+  "type": "module",
+  "license": "MIT",
+  "author": "灰木同学 <hmtx1024@outlook.com>",
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "index.ts",
+    "src",
+    "CHANGELOG.md"
+  ],
+  "keywords": [
+    "pi",
+    "pi-package",
+    "extension",
+    "subagents",
+    "delegation"
+  ],
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "test:live": "node scripts/live-smoke.mjs"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "^1.4.0",
+    "@earendil-works/pi-coding-agent": "^1.4.0",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.0.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*"
+  }
+}
