@@ -346,3 +346,4 @@ Repository layout:
 | `docs/specs/` | behaviour specifications, current and superseded |
 | `docs/history/` | design records: the tickets each version came from, and the real-model test report |
 | `scripts/manual-test/` | RPC driver and fixtures for scripted end-to-end runs against a real `pi` process |
+| `RELEASING.md` | how a version is cut, verified, and published |

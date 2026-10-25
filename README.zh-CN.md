@@ -320,3 +320,4 @@ npm run test:live   # live 冒烟套件（真实 provider，真实花费）
 | `docs/specs/` | 行为规格，含现行与已被取代的版本 |
 | `docs/history/` | 设计记录：各版本对应的票据，以及真实模型测试报告 |
 | `scripts/manual-test/` | RPC 驱动与夹具，用于对真实 `pi` 进程做脚本化端到端运行 |
+| `RELEASING.md` | 版本如何切分、验证与发布 |
