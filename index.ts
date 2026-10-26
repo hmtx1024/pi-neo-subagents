@@ -139,8 +139,8 @@ function buildTaskDescription(agents: AgentDefinition[], cwd: string, agentDir: 
 	const lines = [
 		"Delegate work to named subagents. Write self-contained task descriptions: a subagent sees nothing else.",
 		"An entry can be just { task } (generic worker); instructions, tools, model optional — no definition file created.",
-		"Shapes: { agent, task } · { tasks: [...] } concurrent, results in submission order · { chain: [...] } ordered, {previous} = previous reply.",
-		'Host extension tools (search etc.) reach subagents by default; a "tools" list narrows them.',
+		"Shapes: { agent, task } · { tasks: [...] } concurrent (submission order) · { chain: [...] } ordered ({previous} = prior reply).",
+		'Host extension tools (search etc.) reach subagents by default; "tools" narrows.',
 		`Definitions: ${projectDir} overrides ${userDir}.`,
 	];
 	if (agents.length === 0) {
