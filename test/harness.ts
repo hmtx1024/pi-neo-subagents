@@ -144,6 +144,8 @@ export interface TestSessionOptions {
 	subdir?: string;
 	/** Scripted dialog answers (input/confirm/editor). */
 	dialogs?: ScriptedDialogs;
+	/** Extra extension files loaded alongside the plugin (host-side extension tools). */
+	extraExtensionPaths?: string[];
 }
 
 export async function createTestSession(options?: TestSessionOptions): Promise<TestSession> {
@@ -176,7 +178,7 @@ export async function createTestSession(options?: TestSessionOptions): Promise<T
 	const resourceLoader = new DefaultResourceLoader({
 		cwd: sessionCwd,
 		agentDir,
-		additionalExtensionPaths: [EXTENSION_PATH],
+		additionalExtensionPaths: [EXTENSION_PATH, ...(options?.extraExtensionPaths ?? [])],
 	});
 	await resourceLoader.reload();
 

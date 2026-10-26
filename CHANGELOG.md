@@ -4,6 +4,45 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] — 2026-10-26
+
+Execution safety nets and host extension tools, both driven by real-usage
+reporting.
+
+### Added
+
+- **Default execution budgets.** Every delegation now has a safety net when
+  neither the definition nor the call sets one: `subagents.defaultMaxTurns`
+  (50) and `subagents.defaultTimeoutMs` (5 minutes); set either to `0` to
+  disable. A runaway model loop or a hung command now comes back cut short with
+  the existing `Budget stop: …` notice (never an error) instead of blocking a
+  fan-out forever. Explicit definition or per-call values always win.
+- **Host extension tools bridge into subagents.** Naming an extension tool
+  (a search plugin, a browser, an MCP-backed tool) in a delegation's `tools`
+  exposes it to the subagent, running the host implementation with the host
+  session's own dialogs and permissions. Whitelist-driven: no `tools` list, no
+  bridging; `task` and `create_subagent` never cross.
+
+### Fixed
+
+- A definition could **promise a tool a subagent could never receive**:
+  `create_subagent` validated tool names against the host tool map while
+  nested sessions disable extensions outright, so the model hit
+  `Tool X not found` at run time (for example with a search plugin installed).
+  Whitelists the subagent cannot satisfy now fail the delegation naming the
+  missing tools, and creation rejects `create_subagent` for subagents the same
+  way it already rejected `task`.
+- `/subagents run` fails loudly with the same message when a definition needs a
+  bridged tool — command contexts cannot reach host tools, so it says so instead
+  of silently dropping the tool.
+
+### Changed
+
+- The `task` tool description now states the bridging rule (extension tools
+  cross only when named in `tools`).
+- Documentation: both READMEs cover the default budgets and the "Host extension
+  tools" section. The hermetic suite grew from 112 to 124 tests.
+
 ## [0.1.3] — 2026-10-25
 
 Documentation only; no behaviour changes.

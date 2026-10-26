@@ -19,6 +19,7 @@ import {
 	getAgentDir,
 	type ExtensionAPI,
 	type ExtensionCommandContext,
+	type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 
 import {
@@ -90,6 +91,48 @@ function formatDirectRun(name: string, outcome: DelegationOutcome): string {
 	return `${outcome.resultText.slice(0, DISPLAY_LIMIT)}\n\n[Display truncated at ${DISPLAY_LIMIT} characters. Full result: ${path}]\n\n${footer}`;
 }
 
+/** Tools a subagent never receives, even when a whitelist names them. */
+const BRIDGE_WITHHELD = new Set(["task", "create_subagent"]);
+
+/** Minimal shape of a callable host tool (ctx.tools / getCallableTools()). */
+interface CallableTool {
+	name: string;
+	label: string;
+	description: string;
+	parameters: unknown;
+	execute: (
+		toolCallId: string,
+		params: never,
+		signal?: AbortSignal,
+		onUpdate?: (result: never) => void,
+	) => Promise<unknown>;
+}
+
+/**
+ * Bridge wrappers for host EXTENSION tools (built-ins are already available
+ * natively in the subagent; MCP and other external tools are not). The wrapper
+ * forwards to the host tool itself, whose execution carries the host session's
+ * own context — UI dialogs and permission behaviour included. The whitelist
+ * filter happens at the delegation layer, per definition.
+ */
+function buildBridges(ctx: unknown, pi: ExtensionAPI): ToolDefinition[] {
+	const source = ctx as { tools?: readonly unknown[]; getCallableTools?: () => readonly unknown[] };
+	const tools = (source.tools ?? source.getCallableTools?.() ?? []) as readonly CallableTool[];
+	const builtin = new Set(
+		pi.getAllTools().filter((info) => info.sourceInfo?.source === "builtin").map((info) => info.name),
+	);
+	return tools
+		.filter((tool) => !BRIDGE_WITHHELD.has(tool.name) && !builtin.has(tool.name))
+		.map((tool) => ({
+			name: tool.name,
+			label: tool.label,
+			description: tool.description,
+			parameters: tool.parameters as ToolDefinition["parameters"],
+			execute: (toolCallId: string, params: never, signal?: AbortSignal, onUpdate?: (result: never) => void) =>
+				tool.execute(toolCallId, params, signal, onUpdate),
+		})) as ToolDefinition[];
+}
+
 function buildTaskDescription(agents: AgentDefinition[], cwd: string, agentDir: string): string {
 	const projectDir = join(cwd, ".pi", "agents");
 	const userDir = join(agentDir, "agents");
@@ -97,6 +140,7 @@ function buildTaskDescription(agents: AgentDefinition[], cwd: string, agentDir: 
 		"Delegate work to named subagents. Write self-contained task descriptions: a subagent sees nothing else.",
 		"An entry may give inline instructions (plus optional tools/model) instead of an agent name for one-off work; no definition file is created.",
 		"Shapes: { agent, task } for one delegation, { tasks: [{ agent, task }, ...] } to fan out concurrently (results return in submission order), or { chain: [{ agent, task }, ...] } to run steps in order where a step may reference the previous reply with {previous}.",
+		"A subagent uses a host extension tool (for example a search tool) only when its name is listed in \"tools\" for that delegation.",
 		"",
 		`Agent definitions live in ${projectDir} (project scope, preferred) and ${userDir} (user scope).`,
 		"Project definitions override user definitions with the same name.",
@@ -287,6 +331,14 @@ function formatOutcomes(outcomes: readonly TaskOutcome[]): string {
 }
 
 /** Details entry for one chain step (includes skipped steps). */
+/** Settings-backed default budgets; 0 in settings means "no cap". */
+function budgetDefaults(settings: SubagentSettings) {
+	return {
+		...(settings.defaultMaxTurns > 0 ? { maxTurns: settings.defaultMaxTurns } : {}),
+		...(settings.defaultTimeoutMs > 0 ? { timeoutMs: settings.defaultTimeoutMs } : {}),
+	};
+}
+
 function stepDetails(outcomes: readonly TaskOutcome[]) {
 	return outcomes.map((outcome) => ({
 		index: outcome.index,
@@ -481,6 +533,7 @@ function createTaskTool(
 	recordRun: (record: { agent: string; status: LedgerStatus; details: TaskDetails }) => void,
 	getSettings: () => SubagentSettings,
 	approvals: Map<string, boolean>,
+	pi: ExtensionAPI,
 ) {
 	return defineTool<typeof taskParameters, TaskDetails | ParallelDetails | ChainDetails>({
 		name: "task",
@@ -490,6 +543,8 @@ function createTaskTool(
 
 		async execute(_toolCallId, params, signal, onUpdate, ctx) {
 			const shape = dispatchShape(params);
+			// Host extension tools available for this call's whitelists to name.
+			const bridges = buildBridges(ctx, pi);
 			// Live view state: one line per in-flight delegation, TUI only.
 			const live = new Map<string, { agent: string; turn: number; tool?: string }>();
 			const renderLive = () => {
@@ -536,6 +591,8 @@ function createTaskTool(
 					signal,
 					onRun: recordRun,
 					maxDepth: getSettings().maxDepth,
+					bridges,
+					defaults: budgetDefaults(getSettings()),
 					onProgress: (index, agent, details) => {
 						track.onProgress(String(index))(agent)(details);
 						onUpdate?.({
@@ -582,6 +639,8 @@ function createTaskTool(
 					signal,
 					onRun: recordRun,
 					maxDepth: getSettings().maxDepth,
+					bridges,
+					defaults: budgetDefaults(getSettings()),
 					onProgress: (index, agent, details) => {
 						track.onProgress(String(index))(agent)(details);
 						onUpdate?.({
@@ -631,6 +690,8 @@ function createTaskTool(
 				limits: single.limits,
 				signal,
 				maxDepth: getSettings().maxDepth,
+				defaults: budgetDefaults(getSettings()),
+				bridges,
 				onRun: recordRun,
 				onActivity: (activity) => track.onActivity("0")(identityOf(single))(activity),
 				onProgress: (details) => {
@@ -831,7 +892,15 @@ async function handleRemove(rest: string, ctx: ExtensionCommandContext): Promise
 }
 
 /** `/subagents run <name> [--to-context] <task>` — user-invoked delegation. */
-async function handleRun(rest: string, ctx: ExtensionCommandContext, pi: ExtensionAPI): Promise<void> {
+async function handleRun(
+	rest: string,
+	ctx: ExtensionCommandContext,
+	pi: ExtensionAPI,
+	getSettings: () => SubagentSettings,
+): Promise<void> {
+	// Command contexts cannot reach host tools (no tools/executeTool on ctx),
+	// so a definition that needs a bridged extension tool fails here loudly
+	// with the delegation-layer message instead of silently degrading.
 	const parsed = parseRunArguments(rest);
 	if (!parsed.ok) {
 		present(ctx, parsed.error, "error");
@@ -846,6 +915,7 @@ async function handleRun(rest: string, ctx: ExtensionCommandContext, pi: Extensi
 			agentName: name,
 			task,
 			signal: ctx.signal,
+			defaults: budgetDefaults(getSettings()),
 			onProgress: (details) => ctx.ui.setStatus("subagents", `${name} · turn ${details.turns}`),
 		});
 		present(ctx, formatDirectRun(name, outcome));
@@ -895,7 +965,7 @@ export default function (pi: ExtensionAPI) {
 			return;
 		}
 		inventorySignature = description;
-		pi.registerTool(createTaskTool(description, recordRun, getSettings, approvals));
+		pi.registerTool(createTaskTool(description, recordRun, getSettings, approvals, pi));
 	};
 
 	pi.registerTool(createCreateSubagentTool(getSettings));
@@ -916,7 +986,7 @@ export default function (pi: ExtensionAPI) {
 		handler: async (args, ctx) => {
 			const trimmed = args.trim();
 			if (trimmed === "run" || trimmed.startsWith("run ")) {
-				await handleRun(trimmed.slice("run".length).trim(), ctx, pi);
+				await handleRun(trimmed.slice("run".length).trim(), ctx, pi, getSettings);
 				return;
 			}
 			if (trimmed === "new" || trimmed.startsWith("new ")) {

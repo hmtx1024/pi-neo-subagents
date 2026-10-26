@@ -61,6 +61,10 @@ export interface ParallelRequest {
 	onProgress?: (index: number, agent: string, details: TaskDetails) => void;
 	/** Accounting hook, forwarded so every level is recorded once. */
 	onRun?: DelegationRequest["onRun"];
+	/** Settings-backed defaults, forwarded to every delegation. */
+	defaults?: DelegationRequest["defaults"];
+	/** Host extension tools, forwarded to every delegation. */
+	bridges?: DelegationRequest["bridges"];
 	/** Live activity, tagged with the task it belongs to. */
 	onActivity?: (index: number, agent: string, activity: { turn: number; tool: string }) => void;
 	/** Called once a task has settled (finished, failed, or skipped). */
@@ -113,6 +117,8 @@ export async function dispatchParallel(request: ParallelRequest): Promise<TaskOu
 				task: task.task,
 				limits: task.limits,
 				signal: request.signal,
+				...(request.defaults ? { defaults: request.defaults } : {}),
+				...(request.bridges ? { bridges: request.bridges } : {}),
 				...(request.depth !== undefined ? { depth: request.depth } : {}),
 				...(request.maxDepth !== undefined ? { maxDepth: request.maxDepth } : {}),
 				...(request.onRun ? { onRun: request.onRun } : {}),
@@ -191,6 +197,8 @@ export async function dispatchChain(request: ChainRequest): Promise<TaskOutcome[
 				task,
 				limits: step.limits,
 				signal: request.signal,
+				...(request.defaults ? { defaults: request.defaults } : {}),
+				...(request.bridges ? { bridges: request.bridges } : {}),
 				...(request.depth !== undefined ? { depth: request.depth } : {}),
 				...(request.maxDepth !== undefined ? { maxDepth: request.maxDepth } : {}),
 				...(request.onRun ? { onRun: request.onRun } : {}),

@@ -71,8 +71,8 @@ You are a careful code reviewer. Always cite the file you reviewed.
 | `tools` | Whitelist of tool names for the subagent | all default tools |
 | `model` | Model to run on (`provider/id` or bare id) | inherit the host session's model |
 | `systemPrompt` | `replace` makes the body the entire system prompt | append to Pi's default prompt |
-| `maxTurns` | Cap on assistant turns for one delegation | unbounded |
-| `timeoutMs` | Wall-clock cap in milliseconds | unbounded |
+| `maxTurns` | Cap on assistant turns for one delegation | `subagents.defaultMaxTurns` (50) |
+| `timeoutMs` | Wall-clock cap in milliseconds | `subagents.defaultTimeoutMs` (5 min) |
 | `maxTokens` | Cap on total tokens for one delegation | unbounded |
 | `thinking` | Thinking level (`minimal`, `low`, `medium`, `high`, `xhigh`, `max`) | inherit |
 | `allowSubagents` | `true` lets this agent delegate further with the `task` tool | `false` |
@@ -125,6 +125,13 @@ definition, or per call (a per-call value wins):
 // task tool call
 { "agent": "scout", "task": "…", "maxTurns": 3, "timeoutMs": 60000, "thinking": "low" }
 ```
+
+Every delegation also has safety-net defaults, applied whenever neither the
+definition nor the call sets a value: `subagents.defaultMaxTurns` (50) and
+`subagents.defaultTimeoutMs` (5 min). Set either to `0` to disable that cap
+everywhere; an explicit definition or per-call value always wins. This keeps a
+runaway loop or a hung command from blocking a fan-out forever — the run comes
+back cut short, never stuck.
 
 Hitting a cap is a first-class outcome, not a failure: the subagent's reply so
 far comes back with a note naming the budget that tripped, for example
@@ -179,6 +186,26 @@ agent name:
 - Inline entries accept the same `model`, budget, and `tools` options as a
   definition, work in single, fan-out, and chain dispatch, and can never spawn
   further subagents.
+
+### Host extension tools
+
+A subagent never loads host extensions — that isolation is what keeps the
+`task` tool from ever reaching a nested session. As a consequence, tools your
+other extensions provide (search plugins, browsers, MCP-backed tools) are
+absent by default.
+
+Naming such a tool in `tools` **bridges** it: the subagent gets the tool, and
+the call runs the host implementation with the host session's own context
+(its dialogs and permissions included).
+
+- Built-in tools never need bridging; they are available natively.
+- Without a `tools` list nothing bridges — opting in is per delegation.
+- `task` and `create_subagent` never cross, even when named.
+- A list naming a tool the subagent cannot provide fails the delegation and
+  names the tools; nothing is dropped silently.
+- `/subagents run` cannot bridge (command contexts cannot reach host tools):
+  a definition that needs a bridged tool fails there with the same message —
+  delegate through the `task` tool instead.
 
 ### Controlled recursion
 
@@ -293,7 +320,9 @@ Optional settings live under the `subagents` key of Pi's settings (global
     "confirmProjectAgents": "ask",
     "allowModelCreatedDefinitions": true,
     "allowUserScopeCreation": false,
-    "maxDepth": 2
+    "maxDepth": 2,
+    "defaultMaxTurns": 50,
+    "defaultTimeoutMs": 300000
   }
 }
 ```
@@ -304,6 +333,8 @@ Optional settings live under the `subagents` key of Pi's settings (global
 | `allowModelCreatedDefinitions` | whether the model may author definitions with `create_subagent` | `true` |
 | `allowUserScopeCreation` | whether definitions may be written to the user-level directory | `false` |
 | `maxDepth` | delegation depth limit (reserved for controlled recursion) | `2` |
+| `defaultMaxTurns` | safety-net turn budget when neither the definition nor the call sets one (`0` = unlimited) | `50` |
+| `defaultTimeoutMs` | safety-net wall-clock budget in milliseconds (`0` = unlimited) | `300000` |
 
 Consent is remembered per agent for the session, and a denial runs nothing.
 User-level agents and ad-hoc entries never prompt. In a session without a

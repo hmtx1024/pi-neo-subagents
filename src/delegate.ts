@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { Model, Provider, Usage } from "@earendil-works/pi-ai";
-import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { getAgentDir, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 
 import { discoverAgents, type AgentDefinition, type DefinitionThinking } from "./agents.ts";
 import { runSubagent, type BudgetStop, type SpawnHandler } from "./runner.ts";
@@ -82,6 +82,12 @@ export function identityOf(entry: { agent?: string }): string {
 	return entry.agent ?? AD_HOC_AGENT_NAME;
 }
 
+/** Settings-backed defaults for delegations that set neither call nor definition values. */
+export interface DelegationDefaults {
+	maxTurns?: number;
+	timeoutMs?: number;
+}
+
 /** Per-call budget overrides; each wins over the definition's value. */
 export interface DelegationLimits {
 	maxTurns?: number;
@@ -110,6 +116,10 @@ export interface DelegationRequest {
 	signal?: AbortSignal;
 	/** Call-level budget overrides. */
 	limits?: DelegationLimits;
+	/** Settings-backed defaults (lowest precedence; 0 already normalised away). */
+	defaults?: DelegationDefaults;
+	/** Host extension tools available to bridge into the nested session. */
+	bridges?: ToolDefinition[];
 	/** Delegation depth; a top-level delegation is 1. */
 	depth?: number;
 	/** Depth limit for nested delegations. */
@@ -257,9 +267,11 @@ async function runDelegation(request: DelegationRequest): Promise<DelegationOutc
 		throw new Error(`No provider available for model "${model.id}".`);
 	}
 
+	// Precedence: call > definition > settings default. Defaults are only a
+	// safety net: an unset value would mean an unbounded run.
 	const limits = {
-		maxTurns: request.limits?.maxTurns ?? agent.maxTurns,
-		timeoutMs: request.limits?.timeoutMs ?? agent.timeoutMs,
+		maxTurns: request.limits?.maxTurns ?? agent.maxTurns ?? request.defaults?.maxTurns,
+		timeoutMs: request.limits?.timeoutMs ?? agent.timeoutMs ?? request.defaults?.timeoutMs,
 		maxTokens: request.limits?.maxTokens ?? agent.maxTokens,
 		thinking: request.limits?.thinking ?? agent.thinking,
 	};
@@ -286,6 +298,8 @@ async function runDelegation(request: DelegationRequest): Promise<DelegationOutc
 						agentName: entry.agent,
 						task: entry.task,
 						limits: entry.limits,
+						...(request.defaults ? { defaults: request.defaults } : {}),
+						...(request.bridges ? { bridges: request.bridges } : {}),
 						signal: request.signal,
 						depth: childDepth,
 						maxDepth,
@@ -305,6 +319,7 @@ async function runDelegation(request: DelegationRequest): Promise<DelegationOutc
 		signal: request.signal,
 		depth,
 		...(spawn ? { spawn } : {}),
+		...(request.bridges?.length ? { bridges: request.bridges } : {}),
 		...(request.onActivity ? { onActivity: request.onActivity } : {}),
 		...limits,
 		onProgress: (turns) => {

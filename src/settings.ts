@@ -17,6 +17,10 @@ export interface SubagentSettings {
 	allowUserScopeCreation: boolean;
 	/** Maximum delegation depth (reserved for controlled recursion). */
 	maxDepth: number;
+	/** Default turn budget for delegations with none set (0 = unlimited). */
+	defaultMaxTurns: number;
+	/** Default wall-clock budget in milliseconds (0 = unlimited). */
+	defaultTimeoutMs: number;
 }
 
 export const DEFAULT_SUBAGENT_SETTINGS: SubagentSettings = {
@@ -24,6 +28,8 @@ export const DEFAULT_SUBAGENT_SETTINGS: SubagentSettings = {
 	allowModelCreatedDefinitions: true,
 	allowUserScopeCreation: false,
 	maxDepth: 2,
+	defaultMaxTurns: 50,
+	defaultTimeoutMs: 300_000,
 };
 
 /**
@@ -44,6 +50,8 @@ export function readSubagentSettings(raw: unknown): SubagentSettings {
 			DEFAULT_SUBAGENT_SETTINGS.allowUserScopeCreation,
 		),
 		maxDepth: readPositiveInteger(value.maxDepth, DEFAULT_SUBAGENT_SETTINGS.maxDepth),
+		defaultMaxTurns: readNonNegativeInteger(value.defaultMaxTurns, DEFAULT_SUBAGENT_SETTINGS.defaultMaxTurns),
+		defaultTimeoutMs: readNonNegativeInteger(value.defaultTimeoutMs, DEFAULT_SUBAGENT_SETTINGS.defaultTimeoutMs),
 	};
 }
 
@@ -55,6 +63,11 @@ function readConfirmMode(value: unknown): ConfirmMode {
 
 function readBoolean(value: unknown, fallback: boolean): boolean {
 	return typeof value === "boolean" ? value : fallback;
+}
+
+/** Non-negative: `0` is valid here and means "no cap". */
+function readNonNegativeInteger(value: unknown, fallback: number): number {
+	return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : fallback;
 }
 
 function readPositiveInteger(value: unknown, fallback: number): number {

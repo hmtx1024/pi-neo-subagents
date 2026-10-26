@@ -449,6 +449,13 @@ export function createAgentDefinition(request: CreateDefinitionRequest): CreateD
 					error: 'An agent cannot be given the "task" tool: subagents never delegate further.',
 				};
 			}
+			if (tool === "create_subagent") {
+				return {
+					ok: false,
+					error:
+						'An agent cannot be given the "create_subagent" tool: definitions are managed from the host session, not by subagents.',
+				};
+			}
 			if (availableTools && !availableTools.includes(tool)) {
 				return {
 					ok: false,

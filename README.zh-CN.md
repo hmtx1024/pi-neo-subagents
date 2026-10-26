@@ -68,8 +68,8 @@ You are a careful code reviewer. Always cite the file you reviewed.
 | `tools` | 该子代理可用的工具白名单 | 全部默认工具 |
 | `model` | 运行所用模型（`provider/id` 或裸 id） | 继承宿主会话的模型 |
 | `systemPrompt` | `replace` 表示正文就是完整系统提示词 | 追加到 Pi 的默认提示词之后 |
-| `maxTurns` | 单次委派的 assistant 轮数上限 | 不限制 |
-| `timeoutMs` | 墙钟时间上限（毫秒） | 不限制 |
+| `maxTurns` | 单次委派的 assistant 轮数上限 | `subagents.defaultMaxTurns`（50） |
+| `timeoutMs` | 墙钟时间上限（毫秒） | `subagents.defaultTimeoutMs`（5 分钟） |
 | `maxTokens` | 单次委派的总 token 上限 | 不限制 |
 | `thinking` | 思考级别（`minimal`、`low`、`medium`、`high`、`xhigh`、`max`） | 继承 |
 | `allowSubagents` | `true` 允许该代理再用 `task` 工具继续委派 | `false` |
@@ -119,6 +119,12 @@ TODO"，产出的是项目内的 `reviewer.md` 和 `scout.md`，而不是写进�
 { "agent": "scout", "task": "…", "maxTurns": 3, "timeoutMs": 60000, "thinking": "low" }
 ```
 
+每次委派还有一层兜底默认值——定义和调用都没设上限时才生效：
+`subagents.defaultMaxTurns`（50）和 `subagents.defaultTimeoutMs`（5 分钟）。
+把其中任意一个设为 `0` 即在全局关闭该上限；定义里或按调用显式传入的值永远优先。
+这样模型跑飞或命令挂起（宿主 bash 不带显式 timeout 时没有看护）都不会把并发
+派发无限期堵死——运行会被腰斩并如实上报，而不是卡住。
+
 触到上限是一类**正常结果，不是失败**：子代理已经产生的内容会原样返回，并附一句
 指明是哪个预算被触发的提示，例如
 `[Budget stop: turns limit 1 reached (observed 1). Partial reply above.]`。
@@ -165,6 +171,21 @@ TODO"，产出的是项目内的 `reviewer.md` 和 `scout.md`，而不是写进�
   固定标签 `ad-hoc`。
 - 内联条目支持与定义相同的 `model`、预算和 `tools` 选项，可用于单个、并发和
   链式派发，但永远不能再派生下级子代理。
+
+### 宿主扩展工具
+
+子代理永远不加载宿主扩展——正是这个隔离保证了 `task` 工具绝不会进入嵌套会话。
+代价是：你其他扩展提供的工具（搜索插件、浏览器、MCP 工具）默认在子代理里不存在。
+
+在 `tools` 里点名这类工具会把它**桥接**过去：子代理获得该工具，调用执行的是
+宿主实现，携带宿主会话自己的上下文（包括它的对话框与权限行为）。
+
+- 内置工具无需桥接，原生可用。
+- 没有 `tools` 列表就不桥接——按每次委派显式启用。
+- `task` 和 `create_subagent` 即使点名也绝不跨入。
+- 白名单里点了子代理给不了的工具，委派直接失败并点名，绝不静默丢弃。
+- `/subagents run` 无法桥接（命令上下文接触不到宿主工具）：需要桥接工具的定义
+  在该命令下会以同样信息失败——请改用 `task` 工具委派。
 
 ### 受控递归
 
@@ -270,7 +291,9 @@ pi -p "//subagents"          # MSYS 会吃掉一个斜杠
     "confirmProjectAgents": "ask",
     "allowModelCreatedDefinitions": true,
     "allowUserScopeCreation": false,
-    "maxDepth": 2
+    "maxDepth": 2,
+    "defaultMaxTurns": 50,
+    "defaultTimeoutMs": 300000
   }
 }
 ```
@@ -281,6 +304,8 @@ pi -p "//subagents"          # MSYS 会吃掉一个斜杠
 | `allowModelCreatedDefinitions` | 是否允许模型用 `create_subagent` 写定义 | `true` |
 | `allowUserScopeCreation` | 是否允许把定义写进用户级目录 | `false` |
 | `maxDepth` | 委派深度上限 | `2` |
+| `defaultMaxTurns` | 定义和调用都没设时的兜底轮数上限（`0` = 不限） | `50` |
+| `defaultTimeoutMs` | 定义和调用都没设时的兜底墙钟上限（毫秒，`0` = 不限） | `300000` |
 
 确认结果在会话内按代理记忆，拒绝则不执行任何东西。用户级代理和内联（ad-hoc）
 条目从不弹确认。在没有对话框 UI 的会话里，`"ask"` 会直接放行（自动化不会被卡住），

@@ -18,6 +18,7 @@ import {
 	defineTool,
 	getAgentDir,
 	type ExtensionAPI,
+	type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "@earendil-works/pi-ai";
 import type { Model, Provider, ThinkingLevel, Usage } from "@earendil-works/pi-ai";
@@ -77,6 +78,8 @@ export interface RunSubagentOptions {
 	provider: Provider;
 	/** Allowed tool names (agent definition whitelist); omitted means all default tools. */
 	tools?: string[];
+	/** Host extension tools to bridge, when the whitelist names them. */
+	bridges?: ToolDefinition[];
 	signal?: AbortSignal;
 	/** Coarse progress callback: called after each completed subagent turn. */
 	onProgress?: (turns: number) => void;
@@ -103,6 +106,13 @@ export async function runSubagent(options: RunSubagentOptions): Promise<Subagent
 		refreshOnCreate: false,
 	});
 	modelRuntime.registerNativeProvider(options.provider);
+
+	// Whitelist-driven: only a named extension tool crosses into the subagent,
+	// and nothing crosses without a whitelist at all.
+	const bridged =
+		options.tools && options.bridges?.length
+			? options.bridges.filter((tool) => options.tools!.includes(tool.name))
+			: [];
 
 	const replacePrompt = options.agent.systemPrompt === "replace";
 	const resourceLoader = new DefaultResourceLoader({
@@ -136,7 +146,24 @@ export async function runSubagent(options: RunSubagentOptions): Promise<Subagent
 		resourceLoader,
 		...(options.tools ? { tools: options.tools } : {}),
 		...(options.thinking ? { thinkingLevel: options.thinking } : {}),
+		...(bridged.length > 0 ? { customTools: bridged } : {}),
 	});
+
+	// Fail loud: a whitelist the subagent cannot satisfy is a dead end waiting
+	// to happen, so name the missing tools instead of silently dropping them.
+	if (options.tools && options.tools.length > 0) {
+		const provided = new Set(session.getAllTools().map((tool) => tool.name));
+		const missing = options.tools.filter((name) => !provided.has(name));
+		if (missing.length > 0) {
+			session.dispose();
+			throw new Error(
+				`The subagent cannot provide these tools: ${missing.join(", ")}. ` +
+					`Available here: ${provided.size > 0 ? [...provided].join(", ") : "(none)"}. ` +
+					"A host extension tool is available only when the main agent delegates through the " +
+					'task tool and the name is listed in "tools"; "task" and "create_subagent" are never available.',
+			);
+		}
+	}
 
 	const startedAt = Date.now();
 	let observedTurns = 0;
