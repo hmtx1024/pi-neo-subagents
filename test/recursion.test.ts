@@ -189,3 +189,39 @@ it("reports depth in the ledger", async () => {
 		dispose();
 	}
 });
+
+it("honours the configured maximum depth when running through the command", async () => {
+	const { session, faux, root, dispose, agentDir } = await createTestSession();
+	try {
+		// Settings default (maxDepth 2) is enough for one level of nesting; the
+		// command path used to drop the setting and fall back to 1.
+		writeSettings(agentDir, { confirmProjectAgents: "allow" });
+		writeAgent(root, "lead", ["allowSubagents: true"]);
+		writeAgent(root, "worker");
+
+		let sawDepthError = false;
+		let sawChildReply = false;
+		faux.setResponses([
+			// lead (depth 1) asks to delegate one level deeper
+			fauxAssistantMessage(fauxToolCall("task", { agent: "worker", task: "child work" }), {
+				stopReason: "toolUse",
+			}),
+			// the worker (depth 2) answers
+			fauxAssistantMessage("child done"),
+			// back in lead: the tool result tells us whether the child really ran
+			(context: TranscriptContext) => {
+				const dump = JSON.stringify(context.messages);
+				sawDepthError = /depth limit/i.test(dump);
+				sawChildReply = /child done/.test(dump);
+				return fauxAssistantMessage("lead done");
+			},
+		]);
+
+		await session.prompt("/subagents run lead Do the thing");
+
+		expect(sawDepthError).toBe(false);
+		expect(sawChildReply).toBe(true);
+	} finally {
+		dispose();
+	}
+});

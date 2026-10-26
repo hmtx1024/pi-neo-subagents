@@ -250,17 +250,31 @@ export async function delegateTask(request: DelegationRequest): Promise<Delegati
 		});
 		return outcome;
 	} catch (error) {
+		// Accounting must never mask the failure: the model a definition pinned is
+		// reported when it can be resolved, and the host model is the fallback.
+		// (RunLedger does not read this field today; it is kept truthful anyway.)
 		request.onRun?.({
 			agent: identityOf({ agent: request.agentName }),
 			status: "failed",
 			details: {
 				task: request.task,
-				model: request.hostModel?.id ?? "unknown",
+				model: pinnedModelId(request) ?? request.hostModel?.id ?? "unknown",
 				turns: 0,
 				depth: request.depth ?? 1,
 			},
 		});
 		throw error;
+	}
+}
+
+/** The model a named definition pins, or undefined when it pins none / cannot be read. */
+function pinnedModelId(request: DelegationRequest): string | undefined {
+	if (request.agentName === undefined || request.adHoc !== undefined) return undefined;
+	try {
+		const { agents } = discoverAgents(request.cwd, getAgentDir());
+		return agents.find((candidate) => candidate.name === request.agentName)?.model;
+	} catch {
+		return undefined;
 	}
 }
 

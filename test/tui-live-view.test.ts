@@ -147,3 +147,70 @@ it("drops a failed task from the view but still reports it", async () => {
 		dispose();
 	}
 });
+
+it("clears the live row when the delegation fails before it starts", async () => {
+	const { session, faux, ui, dispose } = await createTestSession({ mode: "tui" });
+	try {
+		// Unknown agent: delegateTask throws after the row was seeded, so the
+		// cleanup has to live in a finally — otherwise the row is a ghost that
+		// sits on screen until the next delegation.
+		faux.setResponses([
+			hostDelegation("does-not-exist"),
+			fauxAssistantMessage("Understood."),
+		]);
+
+		await session.prompt("Delegate.");
+
+		expect(ui.widgets[ui.widgets.length - 1].lines).toBeUndefined();
+	} finally {
+		dispose();
+	}
+});
+
+it("drops a settled chain step while the next one is still running", async () => {
+	const { session, faux, ui, root, dispose } = await createTestSession({ mode: "tui" });
+	try {
+		writeAgent(root, "first", "Runs first");
+		writeAgent(root, "second", "Runs second");
+
+		let release!: () => void;
+		const gate = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		const slow = async () => {
+			await gate;
+			return fauxAssistantMessage("second reply");
+		};
+
+		faux.setResponses([
+			fauxAssistantMessage(
+				fauxToolCall("task", {
+					chain: [
+						{ agent: "first", task: "one" },
+						{ agent: "second", task: "two {previous}" },
+					],
+				}),
+				{ stopReason: "toolUse" },
+			),
+			fauxAssistantMessage("first reply"),
+			slow as never,
+			fauxAssistantMessage("Understood."),
+		]);
+
+		const prompt = session.prompt("Chain it.");
+		await new Promise((resolve) => setTimeout(resolve, 80));
+
+		// Step one was visible while it ran, then disappeared the moment it
+		// settled — a chain must not accumulate one row per completed step.
+		const snapshots = ui.widgets.map((widget) => widget.lines?.join("\n") ?? "");
+		expect(snapshots.some((lines) => lines.includes("first"))).toBe(true);
+		const duringRun = ui.widgets[ui.widgets.length - 1].lines?.join("\n") ?? "";
+		expect(duringRun).not.toContain("first");
+
+		release();
+		await prompt;
+		expect(ui.widgets[ui.widgets.length - 1].lines).toBeUndefined();
+	} finally {
+		dispose();
+	}
+});

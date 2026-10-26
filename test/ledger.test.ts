@@ -152,3 +152,20 @@ it("reports stats on stdout in print mode", async () => {
 		stdio.restore();
 	}
 });
+
+it("counts a direct run in the ledger", async () => {
+	const { session, faux, ui, cwd, dispose } = await createTestSession();
+	try {
+		writeAgent(cwd, "reviewer", "Reviews code");
+		faux.setResponses([fauxAssistantMessage("reviewed it")]);
+
+		await session.prompt("/subagents run reviewer Review the changes");
+		await session.prompt("/subagents stats");
+
+		const output = userOutput(ui);
+		expect(output).toContain("reviewer");
+		expect(output).toMatch(/1 run/i);
+	} finally {
+		dispose();
+	}
+});

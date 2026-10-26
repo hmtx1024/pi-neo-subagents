@@ -78,7 +78,7 @@ export interface RunSubagentOptions {
 	provider: Provider;
 	/** Allowed tool names (agent definition whitelist); omitted means all default tools. */
 	tools?: string[];
-	/** Host extension tools to bridge, when the whitelist names them. */
+	/** Host extension tools to bridge; a `tools` list narrows which ones cross. */
 	bridges?: ToolDefinition[];
 	signal?: AbortSignal;
 	/** Coarse progress callback: called after each completed subagent turn. */
@@ -160,8 +160,9 @@ export async function runSubagent(options: RunSubagentOptions): Promise<Subagent
 			throw new Error(
 				`The subagent cannot provide these tools: ${missing.join(", ")}. ` +
 					`Available here: ${provided.size > 0 ? [...provided].join(", ") : "(none)"}. ` +
-					"A host extension tool is available only when the main agent delegates through the " +
-					'task tool and the name is listed in "tools"; "task" and "create_subagent" are never available.',
+					"A host extension tool reaches a subagent only if the host session provides it — " +
+					"delegations through the task tool bridge host tools automatically, while " +
+					"/subagents run cannot; \"task\" and \"create_subagent\" are never available.",
 			);
 		}
 	}

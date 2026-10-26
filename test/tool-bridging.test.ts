@@ -386,3 +386,28 @@ it("refuses an unbridgeable whitelist on the direct-run surface with a clear mes
 		dispose();
 	}
 });
+
+it("explains a missing tool without claiming extension tools must be named", async () => {
+	const { session, faux, root, dispose } = await createTestSession();
+	try {
+		// A name the session cannot provide. Since 0.1.6 extension tools bridge by
+		// default, so the old "only when listed in tools" advice is backwards.
+		writeAgent(root, "reader", ["tools: read, nosuchtool"]);
+
+		faux.setResponses([
+			fauxAssistantMessage(fauxToolCall("task", { agent: "reader", task: "Try it" }), {
+				stopReason: "toolUse",
+			}),
+			fauxAssistantMessage("Understood."),
+		]);
+
+		await session.prompt("Delegate.");
+
+		const text = toolText(lastToolResult(session, "task"));
+		expect(text).toContain("nosuchtool");
+		expect(text).not.toMatch(/only when .*listed in .?tools/i);
+		expect(text).toMatch(/host session|task tool/i);
+	} finally {
+		dispose();
+	}
+});

@@ -520,6 +520,12 @@ function createTaskTool(
 
 			if (shape.kind === "chain") {
 				const steps = shape.chain ?? [];
+				// Seed the step that is about to run; later steps appear when they
+				// take their first turn (a skipped step must never get a row).
+				if (steps[0]) {
+					live.set("0", { agent: identityOf(steps[0]), turn: 0 });
+					renderLive();
+				}
 				const outcomes = await dispatchChain({
 					cwd: ctx.cwd,
 					registry: ctx.modelRegistry,
@@ -618,28 +624,33 @@ function createTaskTool(
 			const single = shape.single!;
 			live.set("0", { agent: identityOf(single), turn: 0 });
 			renderLive();
-			const outcome = await delegateTask({
-				cwd: ctx.cwd,
-				registry: ctx.modelRegistry,
-				hostModel: ctx.model,
-				...delegationTarget(single),
-				task: single.task,
-				limits: single.limits,
-				signal,
-				maxDepth: getSettings().maxDepth,
-				defaults: budgetDefaults(getSettings()),
-				bridges,
-				onRun: recordRun,
-				onActivity: (activity) => track.onActivity("0")(identityOf(single))(activity),
-				onProgress: (details) => {
-					track.onProgress("0")(identityOf(single))(details);
-					onUpdate?.({
-						content: [{ type: "text", text: `Subagent running (turn ${details.turns})…` }],
-						details,
-					});
-				},
-			});
-			track.settle("0")();
+			let outcome: DelegationOutcome;
+			try {
+				outcome = await delegateTask({
+					cwd: ctx.cwd,
+					registry: ctx.modelRegistry,
+					hostModel: ctx.model,
+					...delegationTarget(single),
+					task: single.task,
+					limits: single.limits,
+					signal,
+					maxDepth: getSettings().maxDepth,
+					defaults: budgetDefaults(getSettings()),
+					bridges,
+					onRun: recordRun,
+					onActivity: (activity) => track.onActivity("0")(identityOf(single))(activity),
+					onProgress: (details) => {
+						track.onProgress("0")(identityOf(single))(details);
+						onUpdate?.({
+							content: [{ type: "text", text: `Subagent running (turn ${details.turns})…` }],
+							details,
+						});
+					},
+				});
+			} finally {
+				// A failed or cancelled delegation must not leave a ghost row.
+				track.settle("0")();
+			}
 			return {
 				content: [{ type: "text", text: outcome.resultText }],
 				usage: outcome.usage,
@@ -834,6 +845,7 @@ async function handleRun(
 	ctx: ExtensionCommandContext,
 	pi: ExtensionAPI,
 	getSettings: () => SubagentSettings,
+	recordRun: (record: { agent: string; status: LedgerStatus; details: TaskDetails }) => void,
 ): Promise<void> {
 	// Command contexts cannot reach host tools (no tools/executeTool on ctx),
 	// so a definition that needs a bridged extension tool fails here loudly
@@ -852,7 +864,9 @@ async function handleRun(
 			agentName: name,
 			task,
 			signal: ctx.signal,
+			maxDepth: getSettings().maxDepth,
 			defaults: budgetDefaults(getSettings()),
+			onRun: recordRun,
 			onProgress: (details) => ctx.ui.setStatus("subagents", `${name} · turn ${details.turns}`),
 		});
 		present(ctx, formatDirectRun(name, outcome));
@@ -923,7 +937,7 @@ export default function (pi: ExtensionAPI) {
 		handler: async (args, ctx) => {
 			const trimmed = args.trim();
 			if (trimmed === "run" || trimmed.startsWith("run ")) {
-				await handleRun(trimmed.slice("run".length).trim(), ctx, pi, getSettings);
+				await handleRun(trimmed.slice("run".length).trim(), ctx, pi, getSettings, recordRun);
 				return;
 			}
 			if (trimmed === "new" || trimmed.startsWith("new ")) {

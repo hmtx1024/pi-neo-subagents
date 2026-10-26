@@ -4,6 +4,42 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.7] — 2026-10-26
+
+Correctness fixes from an architecture review of the 0.1.6 tree. All four
+behaviour changes came out of reproducing the defect first; one accounting
+field was corrected without a test because nothing observable reads it.
+
+### Fixed
+
+- **A failed delegation no longer leaves a ghost row in the live view.** The
+  single-delegation path seeded its row and then skipped the cleanup when the
+  delegation threw (unknown agent, unknown model, depth limit, cancellation),
+  so `ghost · turn 0` stayed on screen until the next delegation.
+- **`/subagents run` honours the configured depth limit.** The command path
+  forwarded neither `subagents.maxDepth` nor the ledger hook, so a definition
+  that opted into `allowSubagents` could never nest when started from the
+  command — it always hit the depth limit — and direct runs were missing from
+  `/subagents stats`. Both are forwarded now.
+- **A chain drops each step from the live view as it settles.** `dispatchChain`
+  never called `onSettled`, so completed steps accumulated while the next one
+  ran. Every step (including skipped ones) settles now, and a chain seeds its
+  first row at dispatch like the other shapes do.
+- **The unprovidable-tool error no longer gives 0.1.5 advice.** It claimed a
+  host extension tool arrives "only when the name is listed in tools", which
+  0.1.6 made backwards; it now says the host session decides, the `task` tool
+  bridges automatically, and `/subagents run` cannot.
+- A failed run records the model its definition pinned instead of the host
+  model. `/subagents stats` does not read the field yet — the record is simply
+  truthful now.
+
+### Measured
+
+- Replayed the command path live: `/subagents run` on a `allowSubagents` lead
+  nested a worker that wrote the expected file, with no depth error
+  (2 turns, $0.000668) — the same call failed before the fix.
+- 145 hermetic tests, `tsc` clean.
+
 ## [0.1.6] — 2026-10-26
 
 Fixes from a real-usage session report: the natural ad-hoc entry shape now

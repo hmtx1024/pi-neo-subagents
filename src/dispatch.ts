@@ -225,6 +225,9 @@ export async function dispatchChain(request: ChainRequest): Promise<TaskOutcome[
 			};
 		}
 		outcomes.push(outcome);
+		// Settle every step, including the ones skipped below: a live view keys
+		// rows by index and would otherwise keep rows for work that never ran.
+		request.onSettled?.(index);
 
 		if (outcome.status !== "ok") {
 			for (let rest = index + 1; rest < steps.length; rest += 1) {
@@ -234,6 +237,7 @@ export async function dispatchChain(request: ChainRequest): Promise<TaskOutcome[
 					task: steps[rest].task,
 					status: "skipped",
 				});
+				request.onSettled?.(rest);
 			}
 			break;
 		}
