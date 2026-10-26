@@ -29,7 +29,7 @@ export const DEFAULT_SUBAGENT_SETTINGS: SubagentSettings = {
 	allowUserScopeCreation: false,
 	maxDepth: 2,
 	defaultMaxTurns: 50,
-	defaultTimeoutMs: 300_000,
+	defaultTimeoutMs: 600_000,
 };
 
 /**

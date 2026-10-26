@@ -15,6 +15,7 @@ import { expect, it } from "vitest";
 import { fauxAssistantMessage, fauxText, fauxToolCall } from "@earendil-works/pi-ai/compat";
 
 import { createTestSession, toolResultText, userOutput } from "./harness.ts";
+import { DEFAULT_SUBAGENT_SETTINGS } from "../src/settings.ts";
 
 interface ToolResultMessage {
 	isError?: boolean;
@@ -49,6 +50,11 @@ function adHocCall(task: string) {
 function delay(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+it("defaults to a ten-minute wall-clock watchdog (real research needs it)", () => {
+	expect(DEFAULT_SUBAGENT_SETTINGS.defaultTimeoutMs).toBe(600_000);
+	expect(DEFAULT_SUBAGENT_SETTINGS.defaultMaxTurns).toBe(50);
+});
 
 it("stops a runaway delegation at the default turn budget", async () => {
 	const { session, faux, ui, dispose } = await createTestSession();

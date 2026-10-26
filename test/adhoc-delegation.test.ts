@@ -157,7 +157,7 @@ it("never gives an inline agent the task tool", async () => {
 	}
 });
 
-it("rejects an entry with both an agent and instructions, and one with neither", async () => {
+it("rejects an entry with both an agent and instructions, and one without a task", async () => {
 	const { session, faux, cwd, dispose } = await createTestSession();
 	try {
 		const agentsDir = join(cwd, ".pi", "agents");
@@ -173,7 +173,7 @@ it("rejects an entry with both an agent and instructions, and one with neither",
 				}),
 				{ stopReason: "toolUse" },
 			),
-			fauxAssistantMessage(fauxToolCall("task", { task: "no target at all" }), { stopReason: "toolUse" }),
+			fauxAssistantMessage(fauxToolCall("task", { agent: "reviewer" }), { stopReason: "toolUse" }),
 			fauxAssistantMessage("Understood."),
 		]);
 
@@ -186,7 +186,9 @@ it("rejects an entry with both an agent and instructions, and one with neither",
 		expect(results[0].isError).toBe(true);
 		expect(toolResultText(results[0])).toMatch(/not both|either/i);
 		expect(results[1].isError).toBe(true);
-		expect(toolResultText(results[1])).toMatch(/agent|instructions/i);
+		// Task-only entries are valid now (ticket 07); what remains invalid is
+		// an entry without a task.
+		expect(toolResultText(results[1])).toMatch(/task/i);
 	} finally {
 		dispose();
 	}

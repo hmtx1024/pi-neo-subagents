@@ -138,9 +138,9 @@ function buildTaskDescription(agents: AgentDefinition[], cwd: string, agentDir: 
 	const userDir = join(agentDir, "agents");
 	const lines = [
 		"Delegate work to named subagents. Write self-contained task descriptions: a subagent sees nothing else.",
-		"Inline alternative: instructions (+optional tools/model) instead of an agent name — no definition file is created.",
+		"An entry can be just { task } (generic worker); instructions, tools, model optional — no definition file created.",
 		"Shapes: { agent, task } · { tasks: [...] } concurrent, results in submission order · { chain: [...] } ordered, {previous} = previous reply.",
-		'Host extension tools (search etc.) reach a subagent only when named in "tools".',
+		'Host extension tools (search etc.) reach subagents by default; a "tools" list narrows them.',
 		`Definitions: ${projectDir} overrides ${userDir}.`,
 	];
 	if (agents.length === 0) {
@@ -157,8 +157,8 @@ function buildTaskDescription(agents: AgentDefinition[], cwd: string, agentDir: 
 
 const taskEntryParameters = Type.Object({
 	agent: Type.Optional(Type.String({ description: "definition name" })),
-	instructions: Type.Optional(Type.String({ description: "inline instead of agent; no file" })),
-	tools: Type.Optional(Type.Array(Type.String(), { description: "whitelist; omit = all tools" })),
+	instructions: Type.Optional(Type.String({ description: "persona (default generic worker)" })),
+	tools: Type.Optional(Type.Array(Type.String(), { description: "built-ins + host extensions; a list narrows" })),
 	model: Type.Optional(Type.String({ description: '"provider/id" (default: inherit)' })),
 	task: Type.String({ description: "self-contained task" }),
 	maxTurns: Type.Optional(Type.Number({ description: "turn cap (overrides)" })),
@@ -169,8 +169,8 @@ const taskEntryParameters = Type.Object({
 
 const taskParameters = Type.Object({
 	agent: Type.Optional(Type.String({ description: "definition name" })),
-	instructions: Type.Optional(Type.String({ description: "inline instead of agent; no file" })),
-	tools: Type.Optional(Type.Array(Type.String(), { description: "whitelist; omit = all tools" })),
+	instructions: Type.Optional(Type.String({ description: "persona (default generic worker)" })),
+	tools: Type.Optional(Type.Array(Type.String(), { description: "built-ins + host extensions; a list narrows" })),
 	model: Type.Optional(Type.String({ description: '"provider/id" (default: inherit)' })),
 	task: Type.Optional(Type.String({ description: "self-contained task" })),
 	tasks: Type.Optional(
@@ -314,7 +314,7 @@ const createSubagentParameters = Type.Object({
 	name: Type.String({ description: "e.g. python-dev" }),
 	description: Type.String({ description: "when to delegate" }),
 	instructions: Type.String({ description: "markdown body" }),
-	tools: Type.Optional(Type.Array(Type.String(), { description: "whitelist; omit = all" })),
+	tools: Type.Optional(Type.Array(Type.String(), { description: "built-ins + host extensions; a list narrows" })),
 	model: Type.Optional(Type.String({ description: "provider/id" })),
 	maxTurns: Type.Optional(Type.Number({ description: "turn cap" })),
 	maxTokens: Type.Optional(Type.Number({ description: "token cap" })),

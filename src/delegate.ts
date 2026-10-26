@@ -46,12 +46,19 @@ export interface AdHocSpec {
 }
 
 /**
- * Normalise a dispatch entry into a delegation target. Exactly one of `agent`
- * and `instructions` is required; both or neither is a caller error.
+ * Normalise a dispatch entry into a delegation target. An entry names either an
+ * `agent` or inline `instructions` — or neither, in which case the `task` alone
+ * runs with a generic worker persona (the natural input; a real-usage session
+ * burned two host rounds learning this the hard way). Both `agent` and
+ * `instructions` is a caller error.
  */
+export const DEFAULT_AD_HOC_INSTRUCTIONS =
+	"You are a careful worker. Complete the task exactly as described, verify the outcome, and report it.";
+
 export function delegationTarget(entry: {
 	agent?: string;
 	instructions?: string;
+	task?: string;
 	tools?: string[];
 	model?: string;
 	limits?: DelegationLimits;
@@ -62,7 +69,17 @@ export function delegationTarget(entry: {
 		throw new Error('An entry needs either an "agent" name or "instructions", not both.');
 	}
 	if (!hasAgent && !hasInstructions) {
-		throw new Error('Each entry needs an "agent" name or inline "instructions".');
+		if (entry.task !== undefined && entry.task.trim() !== "") {
+			return {
+				adHoc: {
+					instructions: DEFAULT_AD_HOC_INSTRUCTIONS,
+					...(entry.tools && entry.tools.length > 0 ? { tools: entry.tools } : {}),
+					...(entry.model ? { model: entry.model } : {}),
+					...(entry.limits ? { limits: entry.limits } : {}),
+				},
+			};
+		}
+		throw new Error('Each entry needs a "task"; "agent" and "instructions" are optional.');
 	}
 	if (hasInstructions) {
 		return {

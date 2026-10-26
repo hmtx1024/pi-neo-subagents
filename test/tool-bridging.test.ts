@@ -23,6 +23,12 @@ import { createTestSession, userOutput } from "./harness.ts";
 
 const SEARCH_EXTENSION = fileURLToPath(new URL("./fixtures/search-tool-extension.ts", import.meta.url));
 
+interface ToolInfoLike {
+	name: string;
+	description?: string;
+	parameters?: unknown;
+}
+
 interface ToolResultMessage {
 	isError?: boolean;
 	content: Array<{ type: string; text?: string }>;
@@ -147,12 +153,14 @@ it("keeps whitelist purity: a bridged tool does not drag built-ins in", async ()
 	}
 });
 
-it("does not bridge anything without an explicit whitelist", async () => {
+it("auto-bridges host extension tools when the delegation names no whitelist", async () => {
 	const { session, faux, root, dispose } = await createTestSession({
 		extraExtensionPaths: [SEARCH_EXTENSION],
 	});
 	try {
-		// No `tools:` field: the subagent keeps pi's defaults only.
+		// No `tools:` field: the subagent gets pi's defaults AND the host's
+		// extension tools — the host's own semantics (real-usage lesson: an
+		// ad-hoc research task lost its search plugin and degraded to scraping).
 		writeAgent(root, "helper");
 		let nestedToolNames: string[] = [];
 		let searchResult = "";
@@ -167,19 +175,104 @@ it("does not bridge anything without an explicit whitelist", async () => {
 			},
 			(context: TranscriptContext) => {
 				searchResult = nestedToolResultText(context, "web_search");
-				return fauxAssistantMessage("done");
+				return fauxAssistantMessage("found it");
 			},
 			fauxAssistantMessage("Understood."),
 		]);
 
 		await session.prompt("Delegate.");
 
-		expect(nestedToolNames).toContain("read");
+		expect(nestedToolNames).toContain("web_search");
+		expect(searchResult).toContain("results for: pi");
+		// Withheld tools stay withheld even in the permissive mode.
+		expect(nestedToolNames).not.toContain("task");
+		expect(nestedToolNames).not.toContain("create_subagent");
+
+		const result = lastToolResult(session, "task");
+		expect(result.isError).toBeFalsy();
+	} finally {
+		dispose();
+	}
+});
+
+it("auto-bridges for ad-hoc delegations without a tools field", async () => {
+	const { session, faux, dispose } = await createTestSession({
+		extraExtensionPaths: [SEARCH_EXTENSION],
+	});
+	try {
+		let nestedToolNames: string[] = [];
+		let searchResult = "";
+
+		faux.setResponses([
+			fauxAssistantMessage(
+				fauxToolCall("task", { instructions: "You search things.", task: "Search for pi" }),
+				{ stopReason: "toolUse" },
+			),
+			(context: TranscriptContext) => {
+				nestedToolNames = recordToolsAdded(context);
+				return fauxAssistantMessage(fauxToolCall("web_search", { query: "pi" }), { stopReason: "toolUse" });
+			},
+			(context: TranscriptContext) => {
+				searchResult = nestedToolResultText(context, "web_search");
+				return fauxAssistantMessage("ad-hoc found it");
+			},
+			fauxAssistantMessage("Understood."),
+		]);
+
+		await session.prompt("Delegate inline.");
+
+		expect(nestedToolNames).toContain("web_search");
+		expect(searchResult).toContain("results for: pi");
+	} finally {
+		dispose();
+	}
+});
+
+it("narrows strictly when a whitelist is given but does not name the extension tool", async () => {
+	const { session, faux, root, dispose } = await createTestSession({
+		extraExtensionPaths: [SEARCH_EXTENSION],
+	});
+	try {
+		writeAgent(root, "reader", ["tools: read"]);
+		let nestedToolNames: string[] = [];
+		let searchResult = "";
+
+		faux.setResponses([
+			fauxAssistantMessage(fauxToolCall("task", { agent: "reader", task: "Try searching" }), {
+				stopReason: "toolUse",
+			}),
+			(context: TranscriptContext) => {
+				nestedToolNames = recordToolsAdded(context);
+				return fauxAssistantMessage(fauxToolCall("web_search", { query: "pi" }), { stopReason: "toolUse" });
+			},
+			(context: TranscriptContext) => {
+				searchResult = nestedToolResultText(context, "web_search");
+				return fauxAssistantMessage("could not search");
+			},
+			fauxAssistantMessage("Understood."),
+		]);
+
+		await session.prompt("Delegate.");
+
+		// A named whitelist is an allowlist: web_search stays out.
 		expect(nestedToolNames).not.toContain("web_search");
+		expect(nestedToolNames).toContain("read");
 		expect(searchResult).toMatch(/not found|not registered/i);
 	} finally {
 		dispose();
 	}
+});
+
+it("keeps the schema honest about what omitting tools grants", async () => {
+	const { session, dispose } = await createTestSession();
+	const tools = session.getAllTools() as unknown as ToolInfoLike[];
+	for (const name of ["task", "create_subagent"]) {
+		const tool = tools.find((candidate) => candidate.name === name);
+		const json = JSON.stringify(tool?.parameters ?? {});
+		expect(json, `${name} tools description`).toContain("built-ins + host extensions");
+		expect(json, `${name} must not claim "omit = all"`).not.toContain("omit = all");
+	}
+	dispose();
 });
 
 it("refuses a whitelist containing withheld or unprovidable tools, naming them", async () => {

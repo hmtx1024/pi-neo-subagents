@@ -107,12 +107,15 @@ export async function runSubagent(options: RunSubagentOptions): Promise<Subagent
 	});
 	modelRuntime.registerNativeProvider(options.provider);
 
-	// Whitelist-driven: only a named extension tool crosses into the subagent,
-	// and nothing crosses without a whitelist at all.
-	const bridged =
-		options.tools && options.bridges?.length
+	// Extension tools cross by default — the host session has them, so does the
+	// subagent. A `tools` whitelist narrows the set strictly (naming is then
+	// required to keep a given tool). Withheld tools are already excluded at
+	// the build site in the extension entry.
+	const bridged = !options.bridges?.length
+		? []
+		: options.tools
 			? options.bridges.filter((tool) => options.tools!.includes(tool.name))
-			: [];
+			: options.bridges;
 
 	const replacePrompt = options.agent.systemPrompt === "replace";
 	const resourceLoader = new DefaultResourceLoader({

@@ -4,6 +4,44 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6] — 2026-10-26
+
+Fixes from a real-usage session report: the natural ad-hoc entry shape now
+works, host extension tools reach subagents by default, and the wall-clock
+watchdog grows to ten minutes.
+
+### Fixed
+
+- **A task-only entry works.** `{ task }` alone now runs the job with a generic
+  worker persona (`instructions` stays optional). Before, a model was bounced
+  between "needs agent or instructions" and "task is required" — the observed
+  session burned two host rounds learning the double-field shape the hard way.
+- **Host extension tools reach subagents by default.** Omitting `tools` now
+  grants built-ins *and* the host session's extension tools (search plugins,
+  browsers, MCP-backed tools), running the host implementation with the host
+  session's context. A `tools` list narrows strictly. In the observed session a
+  research subagent lost its search plugin and degraded to scraping search
+  engines with curl — slow, low-quality work that later tripped the time budget.
+  `task` and `create_subagent` never cross, whitelist or not.
+- **The `tools` schema descriptions no longer overpromise.** The 0.1.5 slimming
+  had shortened them to "omit = all tools" while omitting granted built-ins
+  only — actively wrong; a schema-honesty test keeps the wording truthful.
+- **Default wall-clock watchdog: 5 → 10 minutes** (`subagents.defaultTimeoutMs`
+  = 600000). Two real search-heavy subtasks were cut at exactly five minutes,
+  mid-report.
+
+### Changed
+
+- The `task` description documents the task-only shape and the new bridging
+  default; the "Host extension tools" README section (both languages) matches.
+
+### Measured
+
+- Replayed the failing scenario: the task-only fan-out succeeded on the first
+  call (previously three attempts), and a no-`tools` delegation used the host's
+  search tool automatically.
+- 140 hermetic tests, live-model re-measures and the smoke suite all green.
+
 ## [0.1.5] — 2026-10-26
 
 Token-efficiency release, driven by a measured baseline: the host's per-turn
