@@ -64,6 +64,8 @@ export interface ParallelRequest {
 	defaults?: DelegationRequest["defaults"];
 	/** Host extension tools, forwarded to every delegation. */
 	bridges?: DelegationRequest["bridges"];
+	/** Nested-session persistence, forwarded to every delegation. */
+	runSession?: DelegationRequest["runSession"];
 	/** Live activity, tagged with the task it belongs to. */
 	onActivity?: (index: number, agent: string, activity: { turn: number; tool: string }) => void;
 	/** Called once a task has settled (finished, failed, or skipped). */
@@ -126,6 +128,7 @@ async function runTaskOutcome(
 			signal: request.signal,
 			...(request.defaults ? { defaults: request.defaults } : {}),
 			...(request.bridges ? { bridges: request.bridges } : {}),
+			...(request.runSession ? { runSession: request.runSession } : {}),
 			...(request.depth !== undefined ? { depth: request.depth } : {}),
 			...(request.maxDepth !== undefined ? { maxDepth: request.maxDepth } : {}),
 			...(request.onRun ? { onRun: request.onRun } : {}),

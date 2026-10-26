@@ -24,6 +24,7 @@ import { Type } from "@earendil-works/pi-ai";
 import type { Model, Provider, ThinkingLevel, Usage } from "@earendil-works/pi-ai";
 
 import { discoverAgents, type AgentDefinition } from "./agents.ts";
+import type { RunSession } from "./delegate.ts";
 import { parseLimits } from "./limits.ts";
 
 /** Which budget stopped a run, and the value that tripped it. */
@@ -48,6 +49,8 @@ export interface SubagentRun {
 	durationMs: number;
 	/** Set when a budget stopped the run before it finished. */
 	budgetStop?: BudgetStop;
+	/** Child session id, when this run was written to disk. */
+	sessionId?: string;
 }
 
 /** What a nested `task` tool may ask for, and what it gets back. */
@@ -80,6 +83,8 @@ export interface RunSubagentOptions {
 	tools?: string[];
 	/** Host extension tools to bridge; a `tools` list narrows which ones cross. */
 	bridges?: ToolDefinition[];
+	/** Where this nested session may persist itself, for later replay. */
+	runSession?: RunSession;
 	signal?: AbortSignal;
 	/** Coarse progress callback: called after each completed subagent turn. */
 	onProgress?: (turns: number) => void;
@@ -146,12 +151,15 @@ export async function runSubagent(options: RunSubagentOptions): Promise<Subagent
 		cwd: options.cwd,
 		modelRuntime,
 		model: options.model,
-		sessionManager: SessionManager.inMemory(options.cwd),
+		sessionManager: createNestedSessionManager(options),
 		resourceLoader,
 		...(options.tools ? { tools: options.tools } : {}),
 		...(options.thinking ? { thinkingLevel: options.thinking } : {}),
 		...(bridged.length > 0 ? { customTools: bridged } : {}),
 	});
+
+	const sessionId = options.runSession ? session.sessionManager.getSessionId() : undefined;
+	if (options.runSession) nameChildSession(session.sessionManager, options.agent.name);
 
 	// Fail loud: a whitelist the subagent cannot satisfy is a dead end waiting
 	// to happen, so name the missing tools instead of silently dropping them.
@@ -245,6 +253,7 @@ export async function runSubagent(options: RunSubagentOptions): Promise<Subagent
 			usage: sumUsage(assistantMessages),
 			durationMs: Date.now() - startedAt,
 			...(budgetStop ? { budgetStop } : {}),
+			...(sessionId ? { sessionId } : {}),
 		};
 	} finally {
 		if (timer !== undefined) clearTimeout(timer);
@@ -253,6 +262,26 @@ export async function runSubagent(options: RunSubagentOptions): Promise<Subagent
 		if (listening) options.signal?.removeEventListener("abort", abortSession);
 		session.dispose();
 	}
+}
+
+/**
+ * The nested session's storage. When the host session has a file, the child gets
+ * one too — in the same directory (pi's session list only scans the top level)
+ * and with the host recorded as its parent, so `--resume` replays the run with no
+ * replay UI of our own. An unpersisted host stays unpersisted.
+ */
+function createNestedSessionManager(options: RunSubagentOptions): SessionManager {
+	if (!options.runSession) return SessionManager.inMemory(options.cwd);
+	return SessionManager.create(options.cwd, options.runSession.dir, {
+		...(options.runSession.parentFile ? { parentSession: options.runSession.parentFile } : {}),
+	});
+}
+
+/** Human-readable name so a run is identifiable in pi's session list. */
+function nameChildSession(session: { appendSessionInfo(name: string): unknown }, agent: string): void {
+	const now = new Date();
+	const time = now.toISOString().slice(11, 16);
+	session.appendSessionInfo(`↳ ${agent} · ${now.toISOString().slice(0, 10)} ${time}`);
 }
 
 /** Concatenated text blocks of one message, trimmed. */

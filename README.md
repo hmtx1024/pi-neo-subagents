@@ -290,6 +290,27 @@ Delegation ledger (this session):
 Total: 2 runs · $0.001130
 ```
 
+### Persistence and replay
+
+Nothing here keeps its own store. Two pi mechanisms do the work:
+
+- **The ledger is a view over the session log.** Every delegation appends one
+  custom entry (`pi-neo-subagents/run`) to the session file, and `stats` is a
+  fold over those entries. Resume a session and the numbers are still there —
+  no sidecar file, no schema migration, no rotation policy. `stats reset`
+  appends a tombstone rather than rewriting history, so the empty ledger also
+  survives a resume.
+- **A delegation's transcript is a child session.** When the host session has a
+  file, the nested session gets one too: same session directory, named
+  `↳ <agent> · <date> <time>`, with the host recorded as its `parentSession`.
+  Replaying a run is therefore pi's own session browser — resume it and read
+  every turn and tool call. When the host session has no file (in-memory
+  sessions), nothing is written: persistence follows the host's own persistence,
+  so there is no setting for it.
+
+The ledger stays scoped to the current session; the child sessions are ordinary
+session files, so they are yours to keep or delete like any other.
+
 Options are parsed only before the name, so `--to-context` inside a task stays
 part of the task text. Unknown options are rejected with the usage line.
 

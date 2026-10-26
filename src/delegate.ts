@@ -34,6 +34,8 @@ export interface TaskDetails {
 	budgetStop?: BudgetStop;
 	/** Depth this run executed at (host session = 0). */
 	depth: number;
+	/** Child session id, when the nested session was persisted (for replay). */
+	sessionId?: string;
 }
 
 /** Definition-free delegation: instructions plus optional capabilities. */
@@ -99,6 +101,33 @@ export function identityOf(entry: { agent?: string }): string {
 	return entry.agent ?? AD_HOC_AGENT_NAME;
 }
 
+/**
+ * Where a delegation's nested session may write itself, so the run can be
+ * replayed later from pi's own session browser. Absent when the host session has
+ * no file: persistence mirrors the host's persistence, which is why this needs no
+ * setting of its own.
+ */
+export interface RunSession {
+	/** Session directory (same as the host's, so pi's session list finds it). */
+	dir: string;
+	/** Host session file, recorded as the child's `parentSession`. */
+	parentFile?: string;
+}
+
+/** Shape of the host session manager this module needs (structural, ctx-agnostic). */
+export interface SessionLocator {
+	getSessionDir(): string;
+	getSessionFile(): string | undefined;
+}
+
+/** Build a `RunSession` from the host session manager, or undefined when unpersisted. */
+export function runSessionFor(sessionManager: SessionLocator | undefined): RunSession | undefined {
+	if (!sessionManager) return undefined;
+	const parentFile = sessionManager.getSessionFile();
+	if (!parentFile) return undefined;
+	return { dir: sessionManager.getSessionDir(), parentFile };
+}
+
 /** Settings-backed defaults for delegations that set neither call nor definition values. */
 export interface DelegationDefaults {
 	maxTurns?: number;
@@ -137,6 +166,8 @@ export interface DelegationRequest {
 	defaults?: DelegationDefaults;
 	/** Host extension tools available to bridge into the nested session. */
 	bridges?: ToolDefinition[];
+	/** Where the nested session may persist itself (for later replay). */
+	runSession?: RunSession;
 	/** Delegation depth; a top-level delegation is 1. */
 	depth?: number;
 	/** Depth limit for nested delegations. */
@@ -331,6 +362,7 @@ async function runDelegation(request: DelegationRequest): Promise<DelegationOutc
 						limits: entry.limits,
 						...(request.defaults ? { defaults: request.defaults } : {}),
 						...(request.bridges ? { bridges: request.bridges } : {}),
+						...(request.runSession ? { runSession: request.runSession } : {}),
 						signal: request.signal,
 						depth: childDepth,
 						maxDepth,
@@ -351,6 +383,7 @@ async function runDelegation(request: DelegationRequest): Promise<DelegationOutc
 		depth,
 		...(spawn ? { spawn } : {}),
 		...(request.bridges?.length ? { bridges: request.bridges } : {}),
+		...(request.runSession ? { runSession: request.runSession } : {}),
 		...(request.onActivity ? { onActivity: request.onActivity } : {}),
 		...limits,
 		onProgress: (turns) => {
@@ -381,6 +414,7 @@ async function runDelegation(request: DelegationRequest): Promise<DelegationOutc
 			durationMs: run.durationMs,
 			depth,
 			...(limits.thinking ? { thinking: limits.thinking } : {}),
+			...(run.sessionId ? { sessionId: run.sessionId } : {}),
 			...(run.budgetStop ? { budgetStop: run.budgetStop } : {}),
 		},
 		usage: run.usage,

@@ -1,6 +1,11 @@
 /**
  * Per-session delegation ledger: what each agent cost, how it went, and how long
- * it took. In memory only — a ledger belongs to one session.
+ * it took.
+ *
+ * The ledger is a VIEW. The fact is pi's session log: one custom entry per
+ * delegation, appended by the extension (see `RunRecordData`). `/subagents stats`
+ * folds those entries, so a resumed session shows its history without a second
+ * store, a schema migration, or a rotation policy.
  *
  * Internal module — tests observe it through `/subagents stats`.
  */
@@ -33,6 +38,38 @@ export interface LedgerEntry {
 	timedRuns: number;
 	/** Deepest delegation observed for this agent. */
 	maxDepth: number;
+}
+
+/** Session-log entry types this extension owns. */
+export const RUN_ENTRY_TYPE = "pi-neo-subagents/run";
+export const RESET_ENTRY_TYPE = "pi-neo-subagents/reset";
+
+/**
+ * One delegation as written to the session log. Raw, not aggregated: the log
+ * stays lossless so future statistics (per model, per depth, latencies) need a
+ * new fold, not a new store.
+ *
+ * Deliberately no task text — statistics need metadata, and transcripts belong
+ * to the child session (when it is persisted), not here.
+ */
+export interface RunRecordData {
+	v: 1;
+	agent: string;
+	status: LedgerStatus;
+	turns: number;
+	model?: string;
+	depth?: number;
+	durationMs?: number;
+	usage?: Usage;
+	/** Session id of the child session, when the host session was persisted. */
+	sessionId?: string;
+}
+
+/** The entry shape `foldEntries` reads (structurally: anything with these fields). */
+export interface FoldableEntry {
+	type: string;
+	customType?: string;
+	data?: unknown;
 }
 
 const EMPTY_ENTRY = (agent: string): LedgerEntry => ({
@@ -82,6 +119,37 @@ export class RunLedger {
 	reset(): void {
 		this.entriesByName.clear();
 	}
+}
+
+/**
+ * Rebuild a ledger by replaying session-log entries. A reset entry clears
+ * everything before it, which is how `stats reset` survives a resume without
+ * rewriting (or deleting from) an append-only log.
+ *
+ * Pure: same entries in, same ledger out — the caller decides which log to feed,
+ * which is what makes "this session" and (later) "all sessions" the same code.
+ */
+export function foldEntries(entries: readonly FoldableEntry[]): RunLedger {
+	const ledger = new RunLedger();
+	for (const entry of entries) {
+		if (entry.type !== "custom") continue;
+		if (entry.customType === RESET_ENTRY_TYPE) {
+			ledger.reset();
+			continue;
+		}
+		if (entry.customType !== RUN_ENTRY_TYPE) continue;
+		const data = entry.data as RunRecordData | undefined;
+		if (!data || typeof data.agent !== "string" || typeof data.status !== "string") continue;
+		ledger.record({
+			agent: data.agent,
+			status: data.status,
+			turns: data.turns,
+			usage: data.usage,
+			durationMs: data.durationMs,
+			depth: data.depth,
+		});
+	}
+	return ledger;
 }
 
 function formatCount(count: number, singular: string): string {

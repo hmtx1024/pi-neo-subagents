@@ -16,6 +16,7 @@ import {
 	delegateTask,
 	delegationTarget,
 	identityOf,
+	runSessionFor,
 	type DelegationOutcome,
 	type TaskDetails,
 } from "./delegate.ts";
@@ -89,6 +90,8 @@ export function createTaskTool(
 			const shape = dispatchShape(params);
 			// Host extension tools available for this call's whitelists to name.
 			const bridges = buildBridges(ctx, pi);
+			// Child sessions are persisted only when this session is.
+			const runSession = runSessionFor(ctx.sessionManager);
 			// Live view state: one line per in-flight delegation, TUI only.
 			const live = new Map<string, { agent: string; turn: number; tool?: string }>();
 			const renderLive = () => {
@@ -142,6 +145,7 @@ export function createTaskTool(
 					onRun: recordRun,
 					maxDepth: getSettings().maxDepth,
 					bridges,
+					runSession,
 					defaults: budgetDefaults(getSettings()),
 					onProgress: (index, agent, details) => {
 						track.onProgress(String(index))(agent)(details);
@@ -190,6 +194,7 @@ export function createTaskTool(
 					onRun: recordRun,
 					maxDepth: getSettings().maxDepth,
 					bridges,
+					runSession,
 					defaults: budgetDefaults(getSettings()),
 					onProgress: (index, agent, details) => {
 						track.onProgress(String(index))(agent)(details);
@@ -235,6 +240,7 @@ export function createTaskTool(
 					maxDepth: getSettings().maxDepth,
 					defaults: budgetDefaults(getSettings()),
 					bridges,
+					runSession,
 					onRun: recordRun,
 					onActivity: (activity) => track.onActivity("0")(identityOf(single))(activity),
 					onProgress: (details) => {

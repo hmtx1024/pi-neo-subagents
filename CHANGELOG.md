@@ -4,6 +4,41 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.10] — 2026-10-26
+
+The run ledger stops being a number in memory and becomes a fold over pi's own
+session log. No new store: no sidecar file, no schema migration, no rotation, no
+cleanup policy. A delegation also stops throwing its transcript away.
+
+### Added
+
+- **The ledger survives a resume.** Every delegation appends one custom entry
+  (`pi-neo-subagents/run`) to the session file; `session_start` replays those
+  entries into the ledger, so `/subagents stats` shows the session's history
+  instead of starting from zero. The entry holds the raw record (agent, status,
+  turns, model, depth, duration, usage, child session id) rather than an
+  aggregate, so future statistics need a new fold, not a new store. No task text
+  is recorded.
+- **`stats reset` leaves a tombstone.** It appends `pi-neo-subagents/reset`
+  instead of rewriting the log, so an emptied ledger also stays empty across a
+  resume — the append-only log needs no deletion path.
+- **A delegation's transcript is a child session.** When the host session has a
+  file, the nested session writes one too: in the same session directory (pi's
+  session list only scans the top level), named `↳ <agent> · <date> <time>`, with
+  the host recorded as its `parentSession`. Replaying a run is then pi's own
+  session browser — resume it and read every turn and tool call. No replay UI, no
+  second format.
+- Persistence follows the host: an in-memory host session writes nothing, so
+  there is no setting controlling it.
+
+### Measured
+
+- Live: one delegation produced the host log entry (`agent=worker, ok, 4 turns`)
+  whose `sessionId` matches the child file exactly; the child carries
+  `parentSession`, the `↳ worker · …` name, and 13 transcript entries on disk.
+- 157 hermetic tests (9 new), `tsc` clean, live smoke 2/2. `/subagents stats`
+  with no history prints exactly what it printed before.
+
 ## [0.1.9] — 2026-10-26
 
 A documentation-accuracy release: the code claimed one isolation boundary and

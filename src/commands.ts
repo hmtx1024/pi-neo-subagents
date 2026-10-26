@@ -19,7 +19,7 @@ import {
 	parseAgentText,
 	type AgentDefinition,
 } from "./agents.ts";
-import { delegateTask, resolveModel, type TaskDetails } from "./delegate.ts";
+import { delegateTask, resolveModel, runSessionFor, type TaskDetails } from "./delegate.ts";
 import { formatLedger, type LedgerStatus, type RunLedger } from "./ledger.ts";
 import { formatDirectRun, formatTimestamp, present } from "./output.ts";
 import type { SubagentSettings } from "./settings.ts";
@@ -231,6 +231,7 @@ export async function handleRun(
 			signal: ctx.signal,
 			maxDepth: getSettings().maxDepth,
 			defaults: budgetDefaults(getSettings()),
+			runSession: runSessionFor(ctx.sessionManager),
 			onRun: recordRun,
 			onProgress: (details) => ctx.ui.setStatus("subagents", `${name} · turn ${details.turns}`),
 		});
@@ -251,6 +252,8 @@ export interface CommandDeps {
 	pi: ExtensionAPI;
 	getSettings: () => SubagentSettings;
 	recordRun: (record: { agent: string; status: LedgerStatus; details: TaskDetails }) => void;
+	/** Clear the ledger and leave a reset entry in the session log. */
+	resetLedger: () => void;
 	ledger: RunLedger;
 }
 
@@ -281,7 +284,7 @@ export async function handleSubagentsCommand(
 		return;
 	}
 	if (trimmed === "stats reset") {
-		deps.ledger.reset();
+		deps.resetLedger();
 		present(ctx, "Delegation ledger reset.");
 		return;
 	}

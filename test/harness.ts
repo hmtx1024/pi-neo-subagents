@@ -26,6 +26,7 @@ import {
 	DefaultResourceLoader,
 	ModelRuntime,
 	SessionManager,
+	type FileEntry,
 	type AgentSession,
 	type ExtensionUIContext,
 } from "@earendil-works/pi-coding-agent";
@@ -132,6 +133,8 @@ export interface TestSession {
 	root: string;
 	/** User agent directory for this test (user-level agent definitions live here). */
 	agentDir: string;
+	/** Where a persisted session (and its child sessions) writes its files. */
+	sessionDir: string;
 	dispose(): void;
 }
 
@@ -146,6 +149,40 @@ export interface TestSessionOptions {
 	dialogs?: ScriptedDialogs;
 	/** Extra extension files loaded alongside the plugin (host-side extension tools). */
 	extraExtensionPaths?: string[];
+	/**
+	 * Entries to seed the session log with, simulating a resumed session: the
+	 * extension sees them exactly as it would after `--resume`.
+	 */
+	seedEntries?: Array<{ customType: string; data?: unknown }>;
+	/** Give the session a real file on disk (needed to observe session-level persistence). */
+	persistSession?: boolean;
+}
+
+/** Seeded entries must look like what the session file holds. */
+function seedFileEntries(seed: Array<{ customType: string; data?: unknown }>): FileEntry[] {
+	return seed.map((entry, index) => ({
+		type: "custom" as const,
+		customType: entry.customType,
+		...(entry.data === undefined ? {} : { data: entry.data }),
+		id: `seed-${index}`,
+		parentId: index === 0 ? null : `seed-${index - 1}`,
+		timestamp: new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString(),
+	}));
+}
+
+/**
+ * A session that behaves like the one under test: either purely in memory (the
+ * default, hermetically silent) or backed by a real file, which is what makes
+ * session-level persistence observable.
+ */
+function createSessionManager(options: TestSessionOptions | undefined, sessionCwd: string, sessionDir: string): SessionManager {
+	const seed = seedFileEntries(options?.seedEntries ?? []);
+	if (options?.persistSession) {
+		if (seed.length > 0) throw new Error("persistSession and seedEntries are mutually exclusive here");
+		mkdirSync(sessionDir, { recursive: true });
+		return SessionManager.create(sessionCwd, sessionDir);
+	}
+	return SessionManager.inMemory(sessionCwd, undefined, seed);
 }
 
 export async function createTestSession(options?: TestSessionOptions): Promise<TestSession> {
@@ -158,6 +195,8 @@ export async function createTestSession(options?: TestSessionOptions): Promise<T
 	const root = cwd;
 	const sessionCwd = options?.subdir ? join(cwd, options.subdir) : cwd;
 	if (options?.subdir) mkdirSync(sessionCwd, { recursive: true });
+	const sessionDir = join(agentDir, "sessions");
+	mkdirSync(sessionDir, { recursive: true });
 
 	const modelRuntime = await ModelRuntime.create({
 		authPath: join(agentDir, "auth.json"),
@@ -187,7 +226,7 @@ export async function createTestSession(options?: TestSessionOptions): Promise<T
 		agentDir,
 		modelRuntime,
 		model: faux.getModel(),
-		sessionManager: SessionManager.inMemory(sessionCwd),
+		sessionManager: createSessionManager(options, sessionCwd, sessionDir),
 		resourceLoader,
 	});
 
@@ -206,6 +245,7 @@ export async function createTestSession(options?: TestSessionOptions): Promise<T
 		cwd: sessionCwd,
 		root,
 		agentDir,
+		sessionDir,
 		dispose() {
 			session.dispose();
 			rmSync(root, { recursive: true, force: true });

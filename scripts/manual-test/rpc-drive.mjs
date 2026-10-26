@@ -39,7 +39,7 @@ const prompts = JSON.parse(process.argv[2] ?? "[]");
 
 const child = spawn(
 	process.execPath,
-	[LAUNCHER, "--mode", "rpc", "--no-session", "--no-mcp", ...(process.env.RPC_APPROVE ? ["--approve"] : []), ...(process.env.RPC_NO_EXT ? [] : ["-e", EXTENSION]), ...(process.env.RPC_MODEL ? ["--model", process.env.RPC_MODEL] : [])],
+	[LAUNCHER, "--mode", "rpc", ...(process.env.RPC_PERSIST ? [] : ["--no-session"]), "--no-mcp", ...(process.env.RPC_APPROVE ? ["--approve"] : []), ...(process.env.RPC_NO_EXT ? [] : ["-e", EXTENSION]), ...(process.env.RPC_MODEL ? ["--model", process.env.RPC_MODEL] : [])],
 	{ cwd: CWD, env: { ...process.env, MSYS_NO_PATHCONV: "1" }, stdio: ["pipe", "pipe", "pipe"] },
 );
 
