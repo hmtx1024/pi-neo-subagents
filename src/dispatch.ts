@@ -8,7 +8,6 @@
 import type { Model, Usage } from "@earendil-works/pi-ai";
 
 import {
-	AD_HOC_AGENT_NAME,
 	delegationTarget,
 	delegateTask,
 	identityOf,
@@ -21,7 +20,7 @@ import { combineUsage } from "./runner.ts";
 
 /** Environment knob for the fan-out cap (documented in the README). */
 export const CONCURRENCY_ENV = "PI_NEO_SUBAGENTS_MAX_CONCURRENCY";
-export const DEFAULT_CONCURRENCY = 4;
+const DEFAULT_CONCURRENCY = 4;
 
 export type TaskStatus = "ok" | "budget-stop" | "failed" | "skipped";
 
@@ -76,7 +75,7 @@ export interface ParallelRequest {
 }
 
 /** Resolve the fan-out cap, falling back to the default on missing/invalid values. */
-export function resolveConcurrency(env: NodeJS.ProcessEnv = process.env): number {
+function resolveConcurrency(env: NodeJS.ProcessEnv = process.env): number {
 	const parsed = Number.parseInt(env[CONCURRENCY_ENV] ?? "", 10);
 	return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_CONCURRENCY;
 }
@@ -85,7 +84,7 @@ export function resolveConcurrency(env: NodeJS.ProcessEnv = process.env): number
  * Bounded-concurrency map. Workers pull the next index, so every item runs
  * exactly once, no item starves, and results stay in submission order.
  */
-export async function runWithConcurrency<T, R>(
+async function runWithConcurrency<T, R>(
 	items: readonly T[],
 	limit: number,
 	worker: (item: T, index: number) => Promise<R>,
@@ -104,49 +103,62 @@ export async function runWithConcurrency<T, R>(
 	return results;
 }
 
+/**
+ * Run one entry and shape its outcome. Both shapes share this: the request
+ * assembly, the status mapping, and the "a failure is an outcome, not an
+ * exception" policy. A chain substitutes `task` (the `{previous}` placeholder)
+ * and then settles the steps it never reached on its own.
+ */
+async function runTaskOutcome(
+	request: Omit<ParallelRequest, "tasks">,
+	task: DispatchTask,
+	index: number,
+	effectiveTask: string = task.task,
+): Promise<TaskOutcome> {
+	try {
+		const outcome = await delegateTask({
+			cwd: request.cwd,
+			registry: request.registry,
+			hostModel: request.hostModel,
+			...delegationTarget(task),
+			task: effectiveTask,
+			limits: task.limits,
+			signal: request.signal,
+			...(request.defaults ? { defaults: request.defaults } : {}),
+			...(request.bridges ? { bridges: request.bridges } : {}),
+			...(request.depth !== undefined ? { depth: request.depth } : {}),
+			...(request.maxDepth !== undefined ? { maxDepth: request.maxDepth } : {}),
+			...(request.onRun ? { onRun: request.onRun } : {}),
+			onProgress: (details) => request.onProgress?.(index, identityOf(task), details),
+			onActivity: (activity) => request.onActivity?.(index, identityOf(task), activity),
+		});
+		return {
+			index,
+			agent: identityOf(task),
+			task: effectiveTask,
+			status: outcome.details.budgetStop ? "budget-stop" : "ok",
+			reply: outcome.reply,
+			resultText: outcome.resultText,
+			details: outcome.details,
+			usage: outcome.usage,
+		};
+	} catch (error) {
+		return {
+			index,
+			agent: identityOf(task),
+			task: effectiveTask,
+			status: "failed",
+			error: error instanceof Error ? error.message : String(error),
+		};
+	} finally {
+		request.onSettled?.(index);
+	}
+}
+
 /** Run every task; a failing task is an outcome, never an exception that cancels its siblings. */
 export async function dispatchParallel(request: ParallelRequest): Promise<TaskOutcome[]> {
 	const limit = request.concurrency ?? resolveConcurrency();
-	return runWithConcurrency(request.tasks, limit, async (task, index) => {
-		try {
-			const outcome = await delegateTask({
-				cwd: request.cwd,
-				registry: request.registry,
-				hostModel: request.hostModel,
-				...delegationTarget(task),
-				task: task.task,
-				limits: task.limits,
-				signal: request.signal,
-				...(request.defaults ? { defaults: request.defaults } : {}),
-				...(request.bridges ? { bridges: request.bridges } : {}),
-				...(request.depth !== undefined ? { depth: request.depth } : {}),
-				...(request.maxDepth !== undefined ? { maxDepth: request.maxDepth } : {}),
-				...(request.onRun ? { onRun: request.onRun } : {}),
-				onProgress: (details) => request.onProgress?.(index, identityOf(task), details),
-				onActivity: (activity) => request.onActivity?.(index, identityOf(task), activity),
-			});
-			return {
-				index,
-				agent: identityOf(task),
-				task: task.task,
-				status: outcome.details.budgetStop ? "budget-stop" : "ok",
-				reply: outcome.reply,
-				resultText: outcome.resultText,
-				details: outcome.details,
-				usage: outcome.usage,
-			} satisfies TaskOutcome;
-		} catch (error) {
-			return {
-				index,
-				agent: identityOf(task),
-				task: task.task,
-				status: "failed",
-				error: error instanceof Error ? error.message : String(error),
-			} satisfies TaskOutcome;
-		} finally {
-			request.onSettled?.(index);
-		}
-	});
+	return runWithConcurrency(request.tasks, limit, (task, index) => runTaskOutcome(request, task, index));
 }
 
 /** Combined usage of every task that produced one. */
@@ -155,7 +167,7 @@ export function totalUsage(outcomes: readonly TaskOutcome[]): Usage {
 }
 
 /** Placeholder a chain step uses to consume the previous step's reply. */
-export const PREVIOUS_PLACEHOLDER = "{previous}";
+const PREVIOUS_PLACEHOLDER = "{previous}";
 
 export interface ChainRequest extends Omit<ParallelRequest, "tasks"> {
 	steps: readonly DispatchTask[];
@@ -187,47 +199,9 @@ export async function dispatchChain(request: ChainRequest): Promise<TaskOutcome[
 				? step.task
 				: step.task.split(PREVIOUS_PLACEHOLDER).join(previousReply);
 
-		let outcome: TaskOutcome;
-		try {
-			const result = await delegateTask({
-				cwd: request.cwd,
-				registry: request.registry,
-				hostModel: request.hostModel,
-				...delegationTarget(step),
-				task,
-				limits: step.limits,
-				signal: request.signal,
-				...(request.defaults ? { defaults: request.defaults } : {}),
-				...(request.bridges ? { bridges: request.bridges } : {}),
-				...(request.depth !== undefined ? { depth: request.depth } : {}),
-				...(request.maxDepth !== undefined ? { maxDepth: request.maxDepth } : {}),
-				...(request.onRun ? { onRun: request.onRun } : {}),
-				onProgress: (details) => request.onProgress?.(index, identityOf(step), details),
-				onActivity: (activity) => request.onActivity?.(index, identityOf(step), activity),
-			});
-			outcome = {
-				index,
-				agent: identityOf(step),
-				task,
-				status: result.details.budgetStop ? "budget-stop" : "ok",
-				reply: result.reply,
-				resultText: result.resultText,
-				details: result.details,
-				usage: result.usage,
-			};
-		} catch (error) {
-			outcome = {
-				index,
-				agent: identityOf(step),
-				task,
-				status: "failed",
-				error: error instanceof Error ? error.message : String(error),
-			};
-		}
+		// runTaskOutcome settles this step; the skipped ones are settled below.
+		const outcome = await runTaskOutcome(request, step, index, task);
 		outcomes.push(outcome);
-		// Settle every step, including the ones skipped below: a live view keys
-		// rows by index and would otherwise keep rows for work that never ran.
-		request.onSettled?.(index);
 
 		if (outcome.status !== "ok") {
 			for (let rest = index + 1; rest < steps.length; rest += 1) {

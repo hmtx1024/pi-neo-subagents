@@ -171,7 +171,7 @@ it("applies the thinking level from the definition and echoes it in details", as
 		const reasoningSeen: Array<string | undefined> = [];
 		faux.setResponses([
 			hostDelegation("reviewer"),
-			(context, options: SimpleStreamOptions | undefined) => {
+			(_context, options: SimpleStreamOptions | undefined) => {
 				reasoningSeen.push(options?.reasoning);
 				return fauxAssistantMessage("reviewed");
 			},

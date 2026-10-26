@@ -215,12 +215,15 @@ export async function runSubagent(options: RunSubagentOptions): Promise<Subagent
 		}, timeoutMs);
 		timer.unref?.();
 	}
+	const abortSession = () => session.abort();
+	let listening = false;
 	try {
 		if (options.signal) {
 			if (options.signal.aborted) {
 				throw new Error("Task was cancelled.");
 			}
-			options.signal.addEventListener("abort", () => session.abort(), { once: true });
+			options.signal.addEventListener("abort", abortSession, { once: true });
+			listening = true;
 		}
 		await session.prompt(options.task);
 		if (options.signal?.aborted) {
@@ -242,6 +245,9 @@ export async function runSubagent(options: RunSubagentOptions): Promise<Subagent
 		};
 	} finally {
 		if (timer !== undefined) clearTimeout(timer);
+		// The host signal outlives this run (a fan-out shares one): a listener left
+		// behind would abort an already-disposed session later on.
+		if (listening) options.signal?.removeEventListener("abort", abortSession);
 		session.dispose();
 	}
 }
@@ -300,11 +306,6 @@ function sumUsage(messages: Array<{ usage?: Usage }>): Usage {
 	return combineUsage(messages.map((message) => message.usage).filter((usage): usage is Usage => usage !== undefined));
 }
 
-/**
- * The nested `task` tool: registered only for definitions that opted into
- * spawning, so recursion is impossible without an explicit declaration. The
- * depth limit is enforced by the handler the delegation layer supplied.
- */
 /**
  * The inline extension every nested session loads. Two jobs:
  * - drop Pi's `docs` pointer from the system prompt — a subagent is never asked

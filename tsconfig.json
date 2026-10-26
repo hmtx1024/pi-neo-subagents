@@ -4,6 +4,10 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
+    // Dead imports and unused locals were invisible during the module split;
+    // turning these on keeps the extracted modules honest.
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "noEmit": true,
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,

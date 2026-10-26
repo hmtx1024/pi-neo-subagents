@@ -6,6 +6,8 @@
  * Internal module — tests observe it through behaviour.
  */
 
+import { isPositiveInteger } from "./validate.ts";
+
 export type ConfirmMode = "ask" | "allow" | "deny";
 
 export interface SubagentSettings {
@@ -15,7 +17,7 @@ export interface SubagentSettings {
 	allowModelCreatedDefinitions: boolean;
 	/** Whether definitions may be written to the user-level directory. */
 	allowUserScopeCreation: boolean;
-	/** Maximum delegation depth (reserved for controlled recursion). */
+	/** Maximum delegation depth: 1 allows one level of nesting, 2 allows two. */
 	maxDepth: number;
 	/** Default turn budget for delegations with none set (0 = unlimited). */
 	defaultMaxTurns: number;
@@ -71,5 +73,5 @@ function readNonNegativeInteger(value: unknown, fallback: number): number {
 }
 
 function readPositiveInteger(value: unknown, fallback: number): number {
-	return typeof value === "number" && Number.isInteger(value) && value >= 1 ? value : fallback;
+	return isPositiveInteger(value) ? value : fallback;
 }

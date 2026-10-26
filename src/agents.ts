@@ -8,6 +8,8 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
+import { isPositiveInteger } from "./validate.ts";
+
 /** Thinking levels a definition may pin (matches Pi's session thinking levels). */
 export const THINKING_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
 export type DefinitionThinking = (typeof THINKING_LEVELS)[number];
@@ -67,7 +69,7 @@ const PROJECT_AGENTS_PATH = [".pi", "agents"] as const;
  * project-level definitions, so running Pi inside a subdirectory still finds the
  * repository's agents. Falls back to the working directory itself.
  */
-export function resolveProjectAgentsDir(cwd: string): string {
+function resolveProjectAgentsDir(cwd: string): string {
 	let current = cwd;
 	while (true) {
 		const candidate = join(current, ...PROJECT_AGENTS_PATH);
@@ -100,7 +102,7 @@ export function discoverAgents(cwd: string, agentDir: string): Discovery {
 }
 
 /** Discover agent definitions (Markdown + frontmatter) in one directory. */
-export function discoverAgentsIn(dir: string, source: "project" | "user"): AgentSet {
+function discoverAgentsIn(dir: string, source: "project" | "user"): AgentSet {
 	let entries: string[];
 	try {
 		entries = readdirSync(dir);
@@ -332,7 +334,7 @@ function splitFrontmatter(
 export type AgentScope = "project" | "user";
 
 /** Directory that holds definitions for one scope. */
-export function agentsDirFor(cwd: string, agentDir: string, scope: AgentScope): string {
+function agentsDirFor(cwd: string, agentDir: string, scope: AgentScope): string {
 	return scope === "project" ? join(cwd, ".pi", "agents") : join(agentDir, "agents");
 }
 
@@ -380,7 +382,7 @@ function slugFor(name: string): string {
 }
 
 /** Render a definition file: frontmatter (only what was provided) plus the body. */
-export function renderAgentMarkdown(request: {
+function renderAgentMarkdown(request: {
 	name: string;
 	description: string;
 	instructions: string;
@@ -429,7 +431,7 @@ export function createAgentDefinition(request: CreateDefinitionRequest): CreateD
 	for (const key of ["maxTurns", "maxTokens", "timeoutMs"] as const) {
 		const value = request[key];
 		if (value === undefined) continue;
-		if (!Number.isInteger(value) || value < 1) {
+		if (!isPositiveInteger(value)) {
 			return { ok: false, error: `"${key}" must be a positive integer (got ${value}).` };
 		}
 	}

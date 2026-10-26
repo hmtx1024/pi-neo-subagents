@@ -22,7 +22,7 @@ interface ToolResultMessage {
 	details?: Record<string, unknown>;
 }
 
-function lastToolResult(session: { messages: unknown[] }, toolName: string): ToolResultMessage {
+function lastToolResult(session: { messages: unknown[] }, _toolName: string): ToolResultMessage {
 	const results = (session.messages as Array<{ role: string; toolName?: string }>).filter(
 		(message) => message.role === "toolResult" && message.toolName === taskToolName(),
 	);
@@ -81,7 +81,7 @@ it("delegates inline instructions without any definition or file on disk", async
 });
 
 it("honours an inline tool whitelist, model, and budget", async () => {
-	const { session, faux, cwd, dispose } = await createTestSession();
+	const { session, faux, dispose } = await createTestSession();
 	try {
 		let toolsAdded = "";
 		let nestedModelId = "";
@@ -126,7 +126,7 @@ it("honours an inline tool whitelist, model, and budget", async () => {
 });
 
 it("never gives an inline agent the task tool", async () => {
-	const { session, faux, cwd, dispose } = await createTestSession();
+	const { session, faux, dispose } = await createTestSession();
 	try {
 		let toolsAdded = "";
 		faux.setResponses([
@@ -195,7 +195,7 @@ it("rejects an entry with both an agent and instructions, and one without a task
 });
 
 it("works in fan-out and chain dispatch", async () => {
-	const { session, faux, ui, cwd, dispose } = await createTestSession();
+	const { session, faux, ui, dispose } = await createTestSession();
 	try {
 		const echo: FauxResponseFactory = (context) => fauxAssistantMessage(`reply for ${taskTextOf(context)}`);
 		faux.setResponses([

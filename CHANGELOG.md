@@ -4,6 +4,48 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.8] — 2026-10-26
+
+A structure pass with no behaviour change: the entry file was 1000 lines doing
+seven jobs, and the same rule was implemented in four places. 145 tests ran
+unchanged before and after — the refactor added none and removed none.
+
+### Changed
+
+- **`index.ts` 1002 → 79 lines.** It now only wires: refresh the tool
+  description, register the two tools and the command, feed the ledger. The
+  work moved into `src/output.ts` (all user/model-facing text), `bridges.ts`,
+  `task-params.ts` (schemas + dispatch parsing), `authorize.ts`, `task-tool.ts`,
+  `create-tool.ts` and `commands.ts` (the `/subagents` family).
+- **One definition of a valid budget value** (`src/validate.ts`). It was
+  implemented four times with three policies; the policies stay (throw, return
+  an error, fall back) but the rule itself is shared. Putting it in the budget
+  module first created an import cycle, which is why it is its own leaf module.
+- **`dispatchParallel` / `dispatchChain` share one runner.** They duplicated the
+  request assembly, the status mapping and the failure policy; `onSettled` now
+  has a single call site, so a dead hook cannot reappear the way it did in 0.1.7.
+- The parallel details are shaped by `stepDetails` instead of a hand-copied map.
+- `runSubagent` unsubscribes its abort listener in `finally` — the host signal
+  outlives one run, and a stray listener would abort a disposed session later.
+
+### Added
+
+- `noUnusedLocals` and `noUnusedParameters` in `tsconfig.json`. Enabling them
+  immediately surfaced thirteen dead locals, imports and destructures left
+  behind by earlier refactors — the module split had been silently accumulating
+  exactly this kind of rot.
+
+### Fixed
+
+- Four stale comments, including one that still described `maxDepth` as
+  "reserved for controlled recursion" and a dangling doc block in the runner.
+
+### Measured
+
+- 145 hermetic tests unchanged, `tsc` clean under the new checks, live smoke
+  2/2, and an end-to-end delegation after the split: correct file, no schema
+  fumbles. The published package grows 14 → 21 files (modules), 47.1 kB.
+
 ## [0.1.7] — 2026-10-26
 
 Correctness fixes from an architecture review of the 0.1.6 tree. All four

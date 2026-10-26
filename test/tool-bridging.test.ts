@@ -288,7 +288,7 @@ it("refuses a whitelist containing withheld or unprovidable tools, naming them",
 			fauxAssistantMessage(fauxToolCall("task", { agent: "chaos", task: "Do something" }), {
 				stopReason: "toolUse",
 			}),
-			(context: TranscriptContext) => {
+			(_context: TranscriptContext) => {
 				reply = "I should never run";
 				return fauxAssistantMessage(reply);
 			},
@@ -320,7 +320,7 @@ it("runs a bridged tool that asks the user through the HOST ui", async () => {
 			fauxAssistantMessage(fauxToolCall("task", { agent: "guarded", task: "Search pi" }), {
 				stopReason: "toolUse",
 			}),
-			(context: TranscriptContext) => {
+			(_context: TranscriptContext) => {
 				return fauxAssistantMessage(fauxToolCall("guarded_search", { query: "pi" }), { stopReason: "toolUse" });
 			},
 			(context: TranscriptContext) => {
@@ -340,7 +340,7 @@ it("runs a bridged tool that asks the user through the HOST ui", async () => {
 });
 
 it("rejects creation when a definition asks for a withheld tool", async () => {
-	const { session, faux, root, dispose } = await createTestSession();
+	const { session, faux, dispose } = await createTestSession();
 	try {
 		faux.setResponses([
 			fauxAssistantMessage(

@@ -52,7 +52,7 @@ export interface AdHocSpec {
  * burned two host rounds learning this the hard way). Both `agent` and
  * `instructions` is a caller error.
  */
-export const DEFAULT_AD_HOC_INSTRUCTIONS =
+const DEFAULT_AD_HOC_INSTRUCTIONS =
 	"You are a careful worker. Complete the task exactly as described, verify the outcome, and report it.";
 
 export function delegationTarget(entry: {

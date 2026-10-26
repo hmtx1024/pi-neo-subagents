@@ -61,7 +61,7 @@ it("shows one row per in-flight task in a fan-out", async () => {
 		const gate = new Promise<void>((resolve) => {
 			release = resolve;
 		});
-		const slow = async (context: { messages: unknown[] }) => {
+		const slow = async (_context: { messages: unknown[] }) => {
 			await gate;
 			return fauxAssistantMessage("slow reply");
 		};

@@ -6,6 +6,7 @@
  */
 
 import { THINKING_LEVELS, type DefinitionThinking } from "./agents.ts";
+import { isPositiveInteger } from "./validate.ts";
 
 /** Budget overrides; each value must be a positive integer. */
 export interface RawLimits {
@@ -25,7 +26,7 @@ export interface ParsedLimits {
 /** Positive-integer validation; a bad value is a caller error naming the field. */
 export function positiveInteger(name: string, value: number | undefined): number | undefined {
 	if (value === undefined) return undefined;
-	if (!Number.isInteger(value) || value < 1) {
+	if (!isPositiveInteger(value)) {
 		throw new Error(`${name} must be a positive integer (got ${value}).`);
 	}
 	return value;
