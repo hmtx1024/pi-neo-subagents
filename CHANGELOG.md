@@ -4,6 +4,37 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5] — 2026-10-26
+
+Token-efficiency release, driven by a measured baseline: the host's per-turn
+tool payload and every subagent request got smaller. Delegation behaviour is
+unchanged.
+
+### Changed
+
+- **Slimmer `task` and `create_subagent` schemas.** Field descriptions were
+  rewritten to the bone (fields, shapes, and semantics untouched): the combined
+  host-side surface dropped from 1,518 to ≤1,020 tokens (−33%) — and the host
+  pays it on *every* turn. The guidance itself keeps every line v1/v2 live
+  testing paid for: self-contained task descriptions, the three dispatch shapes
+  with `{previous}`, the inline ad-hoc path, definition discovery/creation, and
+  the extension-tool bridging rule — all locked by invariant tests.
+- **Subagent system prompts drop Pi's documentation pointer.** The `docs` section
+  (343 tokens, 62% of a subagent's system prompt) pointed at Pi's own docs —
+  something an isolated subagent can never need. Nested prompts now run
+  553 → 210 tokens; host sessions keep the section. If a task needs that
+  knowledge, pass it in the task text (both READMEs document the trade-off).
+- `task` description housekeeping: definition-directory paths on one line,
+  redundant empty-inventory hint removed.
+
+### Measured
+
+- Host first-turn payload (input + cached): ≈7,130 → ≈6,700 per turn.
+- Baseline and method: `profiling-report.md` in the repository's scratch notes;
+  the overhead timer ships as `scripts/profile-overhead.mjs`.
+- 132 hermetic tests, live-model re-measure and smoke suite verified the
+  guidance did not regress (models still delegate correctly).
+
 ## [0.1.4] — 2026-10-26
 
 Execution safety nets and host extension tools, both driven by real-usage

@@ -138,99 +138,51 @@ function buildTaskDescription(agents: AgentDefinition[], cwd: string, agentDir: 
 	const userDir = join(agentDir, "agents");
 	const lines = [
 		"Delegate work to named subagents. Write self-contained task descriptions: a subagent sees nothing else.",
-		"An entry may give inline instructions (plus optional tools/model) instead of an agent name for one-off work; no definition file is created.",
-		"Shapes: { agent, task } for one delegation, { tasks: [{ agent, task }, ...] } to fan out concurrently (results return in submission order), or { chain: [{ agent, task }, ...] } to run steps in order where a step may reference the previous reply with {previous}.",
-		"A subagent uses a host extension tool (for example a search tool) only when its name is listed in \"tools\" for that delegation.",
-		"",
-		`Agent definitions live in ${projectDir} (project scope, preferred) and ${userDir} (user scope).`,
-		"Project definitions override user definitions with the same name.",
+		"Inline alternative: instructions (+optional tools/model) instead of an agent name — no definition file is created.",
+		"Shapes: { agent, task } · { tasks: [...] } concurrent, results in submission order · { chain: [...] } ordered, {previous} = previous reply.",
+		'Host extension tools (search etc.) reach a subagent only when named in "tools".',
+		`Definitions: ${projectDir} overrides ${userDir}.`,
 	];
 	if (agents.length === 0) {
-		lines.push(
-			`No agent definitions found. Create one with create_subagent, or add ${join(projectDir, "<name>.md")}.`,
-		);
+		lines.push("No agent definitions found. Create one with create_subagent.");
 	} else {
 		lines.push("", "Available agents:");
 		for (const agent of agents) {
 			lines.push(`- ${agent.name}: ${agent.description}`);
 		}
+		lines.push("", "No match? Create one with create_subagent, then delegate.");
 	}
-	lines.push(
-		"",
-		"When no available agent fits the task, create one with create_subagent (project scope by default), then delegate to it.",
-	);
 	return lines.join("\n");
 }
 
 const taskEntryParameters = Type.Object({
-	agent: Type.Optional(Type.String({ description: "Name of the agent definition to delegate to" })),
-	instructions: Type.Optional(
-		Type.String({
-			description:
-				"Ad-hoc alternative to `agent`: inline instructions for a one-off subagent (no definition file is created)",
-		}),
-	),
-	tools: Type.Optional(
-		Type.Array(Type.String(), { description: "Ad-hoc tool whitelist; omit for all default tools" }),
-	),
-	model: Type.Optional(
-		Type.String({ description: 'Ad-hoc model as "provider/id" or a bare id; omit to inherit' }),
-	),
-	task: Type.String({
-		description: "Self-contained task description; the subagent sees nothing else",
-	}),
-	maxTurns: Type.Optional(Type.Number({ description: "Cap on assistant turns; overrides the definition" })),
-	maxTokens: Type.Optional(Type.Number({ description: "Cap on total tokens; overrides the definition" })),
-	timeoutMs: Type.Optional(
-		Type.Number({ description: "Wall-clock cap in milliseconds; overrides the definition" }),
-	),
-	thinking: Type.Optional(Type.String({ description: `Thinking level for this task (${THINKING_LEVELS.join(", ")})` })),
+	agent: Type.Optional(Type.String({ description: "definition name" })),
+	instructions: Type.Optional(Type.String({ description: "inline instead of agent; no file" })),
+	tools: Type.Optional(Type.Array(Type.String(), { description: "whitelist; omit = all tools" })),
+	model: Type.Optional(Type.String({ description: '"provider/id" (default: inherit)' })),
+	task: Type.String({ description: "self-contained task" }),
+	maxTurns: Type.Optional(Type.Number({ description: "turn cap (overrides)" })),
+	maxTokens: Type.Optional(Type.Number({ description: "token cap (overrides)" })),
+	timeoutMs: Type.Optional(Type.Number({ description: "wall-clock ms (overrides)" })),
+	thinking: Type.Optional(Type.String({ description: "thinking (overrides)" })),
 });
 
 const taskParameters = Type.Object({
-	agent: Type.Optional(Type.String({ description: "Name of the agent definition to delegate to" })),
-	instructions: Type.Optional(
-		Type.String({
-			description:
-				"Ad-hoc alternative to `agent`: inline instructions for a one-off subagent (no definition file is created)",
-		}),
-	),
-	tools: Type.Optional(
-		Type.Array(Type.String(), { description: "Ad-hoc tool whitelist; omit for all default tools" }),
-	),
-	model: Type.Optional(
-		Type.String({ description: 'Ad-hoc model as "provider/id" or a bare id; omit to inherit' }),
-	),
-	task: Type.Optional(
-		Type.String({
-			description: "Self-contained task description; the subagent sees nothing else",
-		}),
-	),
+	agent: Type.Optional(Type.String({ description: "definition name" })),
+	instructions: Type.Optional(Type.String({ description: "inline instead of agent; no file" })),
+	tools: Type.Optional(Type.Array(Type.String(), { description: "whitelist; omit = all tools" })),
+	model: Type.Optional(Type.String({ description: '"provider/id" (default: inherit)' })),
+	task: Type.Optional(Type.String({ description: "self-contained task" })),
 	tasks: Type.Optional(
-		Type.Array(taskEntryParameters, {
-			description: "Several tasks to run concurrently (results come back in submission order)",
-		}),
+		Type.Array(taskEntryParameters, { description: "concurrent; submission order" }),
 	),
 	chain: Type.Optional(
-		Type.Array(taskEntryParameters, {
-			description:
-				"Steps to run in order; a step may reference the previous reply with {previous}",
-		}),
+		Type.Array(taskEntryParameters, { description: "ordered; {previous} = prior reply" }),
 	),
-	maxTurns: Type.Optional(
-		Type.Number({ description: "Cap on assistant turns; overrides the definition" }),
-	),
-	maxTokens: Type.Optional(
-		Type.Number({ description: "Cap on total tokens; overrides the definition" }),
-	),
-	timeoutMs: Type.Optional(
-		Type.Number({ description: "Wall-clock cap in milliseconds; overrides the definition" }),
-	),
-	thinking: Type.Optional(
-		Type.String({
-			description: `Thinking level for this delegation; overrides the definition (${THINKING_LEVELS.join(", ")})`,
-		}),
-	),
+	maxTurns: Type.Optional(Type.Number({ description: "turn cap (overrides)" })),
+	maxTokens: Type.Optional(Type.Number({ description: "token cap (overrides)" })),
+	timeoutMs: Type.Optional(Type.Number({ description: "wall-clock ms (overrides)" })),
+	thinking: Type.Optional(Type.String({ description: `thinking: ${THINKING_LEVELS.join("|")}; overrides` })),
 });
 
 interface DispatchShape {
@@ -359,35 +311,21 @@ function thinkingOverride(value: string | undefined): DefinitionThinking | undef
 }
 
 const createSubagentParameters = Type.Object({
-	name: Type.String({ description: 'Canonical agent name, e.g. "python-dev"' }),
-	description: Type.String({
-		description: "One line describing when to delegate to this agent",
-	}),
-	instructions: Type.String({
-		description: "The agent's Markdown body: specialization, tone, and rules",
-	}),
-	tools: Type.Optional(
-		Type.Array(Type.String(), {
-			description: "Tool whitelist; omit to give the agent all default tools",
-		}),
-	),
-	model: Type.Optional(
-		Type.String({ description: 'Pinned model as "provider/id" or a bare id; omit to inherit' }),
-	),
-	maxTurns: Type.Optional(Type.Number({ description: "Default turn cap for this agent" })),
-	maxTokens: Type.Optional(Type.Number({ description: "Default token cap for this agent" })),
-	timeoutMs: Type.Optional(Type.Number({ description: "Default wall-clock cap in milliseconds" })),
-	thinking: Type.Optional(
-		Type.String({ description: `Thinking level (${THINKING_LEVELS.join(", ")})` }),
-	),
+	name: Type.String({ description: "e.g. python-dev" }),
+	description: Type.String({ description: "when to delegate" }),
+	instructions: Type.String({ description: "markdown body" }),
+	tools: Type.Optional(Type.Array(Type.String(), { description: "whitelist; omit = all" })),
+	model: Type.Optional(Type.String({ description: "provider/id" })),
+	maxTurns: Type.Optional(Type.Number({ description: "turn cap" })),
+	maxTokens: Type.Optional(Type.Number({ description: "token cap" })),
+	timeoutMs: Type.Optional(Type.Number({ description: "ms cap" })),
+	thinking: Type.Optional(Type.String({ description: "thinking level" })),
 	scope: Type.Optional(
 		Type.Union([Type.Literal("project"), Type.Literal("user")], {
-			description: 'Where to write the definition. Default: "project"',
+			description: "write scope",
 		}),
 	),
-	overwrite: Type.Optional(
-		Type.Boolean({ description: "Replace an existing definition of the same name (default: false)" }),
-	),
+	overwrite: Type.Optional(Type.Boolean({ description: "replace same-name" })),
 });
 
 interface CreateSubagentDetails {
@@ -406,10 +344,9 @@ function createCreateSubagentTool(getSettings: () => SubagentSettings) {
 		name: "create_subagent",
 		label: "Create subagent",
 		description: [
-			"Create a named subagent definition (Markdown + frontmatter) so the task tool can delegate to it.",
-			"Defaults to the project directory so the definition travels with the repository and can be reviewed;",
-			'pass scope: "user" to place it in the user-level directory instead.',
-			"Existing definitions are never overwritten unless overwrite: true is set.",
+			"Create a named subagent definition (Markdown + frontmatter) for the task tool.",
+			'Project scope by default (travels with the repo); scope: "user" for the user directory.',
+			"Existing definitions are replaced only with overwrite: true.",
 		].join(" "),
 		parameters: createSubagentParameters,
 

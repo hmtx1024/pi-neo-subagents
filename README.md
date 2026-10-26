@@ -148,6 +148,10 @@ text only, never the host conversation. Its final reply comes back as the tool
 result (oversized replies are truncated at 30,000 characters with the full
 result written to a temp file).
 
+A subagent's prompt is deliberately bare: the definition body plus Pi's core
+rules — no skills, themes, or prompt templates, and no Pi documentation pointer.
+If a task needs that knowledge, pass it in the task text.
+
 ### Fan-out
 
 One call can dispatch several tasks concurrently:

@@ -124,9 +124,7 @@ export async function runSubagent(options: RunSubagentOptions): Promise<Subagent
 		noSkills: true,
 		noPromptTemplates: true,
 		noThemes: true,
-		...(options.spawn
-			? { extensionFactories: [createDelegationExtension(options)] }
-			: {}),
+		extensionFactories: [createSubagentSessionExtension(options)],
 		...(replacePrompt
 			? {
 					systemPromptOverride: () => options.agent.body,
@@ -303,11 +301,27 @@ function sumUsage(messages: Array<{ usage?: Usage }>): Usage {
  * spawning, so recursion is impossible without an explicit declaration. The
  * depth limit is enforced by the handler the delegation layer supplied.
  */
-function createDelegationExtension(options: RunSubagentOptions) {
-	const spawn = options.spawn!;
+/**
+ * The inline extension every nested session loads. Two jobs:
+ * - drop Pi's `docs` pointer from the system prompt — a subagent is never asked
+ *   about pi itself, and the section costs 343 tokens per request. Inline
+ *   extensions still get event handlers although discovered extensions are off.
+ * - register the nested `task` tool, only for definitions that opted into
+ *   spawning, so recursion stays structurally impossible otherwise.
+ */
+function createSubagentSessionExtension(options: RunSubagentOptions) {
 	return {
-		name: "pi-neo-subagents/recursion",
+		name: "pi-neo-subagents/session",
 		factory: (pi: ExtensionAPI) => {
+			pi.on("context_with_system", (event) => {
+				const [first, ...rest] = event.messages;
+				if (first?.role !== "system" || !first.sections?.docs) return undefined;
+				const sections = { ...first.sections };
+				delete sections.docs;
+				return { messages: [{ ...first, sections }, ...rest] };
+			});
+			if (!options.spawn) return;
+			const spawn = options.spawn;
 			const available = discoverAgents(options.cwd, getAgentDir()).agents;
 			const enumeration =
 				available.length === 0

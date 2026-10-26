@@ -136,6 +136,9 @@ function render(record) {
 				console.log(`--- toolResult [${message.toolName}] isError=${message.isError}: ${shorten(message.content, 800)}`);
 			}
 			if (message.role === "user") console.log(`--- user: ${shorten(message.content, 400)}`);
+			if (message.role === "assistant") {
+				console.log(`--- assistant usage=${JSON.stringify(message.usage ?? {})}`);
+			}
 			break;
 		}
 		case "tool_execution_start":
@@ -146,6 +149,9 @@ function render(record) {
 			break;
 		case "tool_execution_end":
 			console.log(`--- tool ${record.toolName} END isError=${record.isError} ${record.durationMs ?? "?"}ms${record.result?.details ? ` details=${shorten(record.result.details, 300)}` : ""}${record.result?.usage ? ` usage=${shorten(record.result.usage, 200)}` : ""}`);
+			if (record.result?.details) {
+				console.log(`--- tool ${record.toolName} END-DETAILS ${JSON.stringify(record.result.details)}`);
+			}
 			break;
 		case "response":
 			if (!record.success) console.log(`\n!!! response error for ${record.command}: ${record.error}`);
