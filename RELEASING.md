@@ -14,11 +14,11 @@ changes are recorded in [CHANGELOG.md](CHANGELOG.md) following
 # 1. Land the work: code, tests, docs.
 # 2. Add the CHANGELOG section for the version you are about to release.
 # 3. Set the version.
-npm pkg set version=0.2.0
+npm pkg set version=<version>     # e.g. 0.1.4
 
 # 4. Verify locally.
 npm ci
-npm test                  # 112 hermetic tests, offline, no credentials
+npm test                  # hermetic tests, offline, no credentials
 npm run typecheck
 
 # 5. Verify packaging.
@@ -27,8 +27,8 @@ npm publish --dry-run     # no warnings, right version, public
 
 # 6. Commit and tag together.
 git add -A
-git commit -m "chore(release): 0.2.0"
-git tag -a v0.2.0 -m "pi-neo-subagents 0.2.0"
+git commit -m "chore(release): <version>"
+git tag -a v<version> -m "pi-neo-subagents <version>"
 git push origin main --follow-tags
 
 # 7. Wait for CI on the pushed commit to turn green.
@@ -36,7 +36,7 @@ git push origin main --follow-tags
 npm publish
 
 # 9. Verify what is actually on the registry.
-npm view pi-neo-subagents@0.2.0 version dist.fileCount dist.unpackedSize engines
+npm view pi-neo-subagents@<version> version dist.fileCount dist.unpackedSize engines
 ```
 
 Then update the GitHub Release — **only the newest version gets one**, see below.
@@ -85,7 +85,7 @@ not the development checkout:
 ```bash
 mkdir /tmp/verify && cd /tmp/verify
 mkdir -p .pi/agents && printf -- '---\ndescription: Reviews code\ntools: read\n---\n\nYou are a careful code reviewer.\n' > .pi/agents/reviewer.md
-pi install npm:pi-neo-subagents@0.2.0 -l --approve
+pi install npm:pi-neo-subagents@<version> -l --approve
 # then start pi and run /subagents — the definition above should be listed
 ```
 
