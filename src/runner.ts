@@ -121,9 +121,12 @@ export async function runSubagent(options: RunSubagentOptions): Promise<Subagent
 	const resourceLoader = new DefaultResourceLoader({
 		cwd: options.cwd,
 		agentDir: getAgentDir(),
+		// A subagent sees its task and definition plus the PROJECT's context files
+		// (AGENTS.md and friends): working here means following this repository's
+		// rules. Host-PRIVATE resources stay out — no extension loading, no skill
+		// index, no prompt templates, no themes. Pi's own `docs` block is dropped
+		// by the session extension below (343 tokens per request).
 		noExtensions: true,
-		// A subagent sees its task and definition only: no host skill index,
-		// prompt templates, themes, or context files leaking into its prompt.
 		noSkills: true,
 		noPromptTemplates: true,
 		noThemes: true,

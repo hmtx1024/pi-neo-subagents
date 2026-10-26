@@ -209,6 +209,19 @@ session's own context (its dialogs and permissions included).
   a definition that needs a bridged tool fails there with the same message —
   delegate through the `task` tool instead.
 
+### What a subagent inherits
+
+The isolation above is about the host's **private** machinery. What a subagent
+does inherit:
+
+- **Project context files** (`AGENTS.md` and the like) from the working
+  directory. A subagent working in this repository follows this repository's
+  rules; the cost is that every subagent turn pays for that file. Keep it lean.
+- Nothing else: the host's conversation history, skill index, prompt templates,
+  themes, discovered extensions, and Pi's own docs block are all withheld
+  (skills and prompts are the host's private inventory; the docs block is simply
+  never useful to a subagent and costs 343 tokens per request).
+
 ### Controlled recursion
 
 By default a subagent cannot delegate further. A definition can opt in:

@@ -4,6 +4,39 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.9] — 2026-10-26
+
+A documentation-accuracy release: the code claimed one isolation boundary and
+implemented a slightly different, arguably better one. Behaviour is unchanged
+byte for byte.
+
+### Fixed
+
+- **The runner no longer claims context files are withheld.** Its comment said a
+  subagent sees "no host skill index, prompt templates, themes, or context
+  files", but `noContextFiles` was never set — so a subagent *does* inherit the
+  project's `AGENTS.md` as the `project_context` section of its system prompt.
+  Verified identical on all four entry paths (ad-hoc, named definition,
+  `/subagents run`, nested depth 2), so this is deliberate semantics with a
+  wrong description, not an ad-hoc quirk.
+
+### Added
+
+- Three characterisation tests pin the boundary: project context reaches the
+  subagent, while the host-private `docs` and `skills` sections never do. They
+  are written green on purpose — the point is that a future change to the
+  resource-loader flags cannot quietly alter what a subagent knows.
+- A "What a subagent inherits" README section (both languages) stating the
+  trade-off plainly: following repo rules costs tokens on every subagent turn,
+  so `AGENTS.md` should stay lean.
+
+### Not changed
+
+- No `subagents.inheritContextFiles` switch. Inheriting project context is the
+  correct default; per this project's rule, semantic changes are opt-in, not
+  default-on.
+- Subagent prompts are byte-identical to 0.1.8.
+
 ## [0.1.8] — 2026-10-26
 
 A structure pass with no behaviour change: the entry file was 1000 lines doing
