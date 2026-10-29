@@ -81,6 +81,7 @@ You are a careful code reviewer. Always cite the file you reviewed.
 | `maxTokens` | Cap on total tokens for one delegation | unbounded |
 | `thinking` | Thinking level (`minimal`, `low`, `medium`, `high`, `xhigh`, `max`) | inherit |
 | `allowSubagents` | `true` lets this agent delegate further with the `task` tool | `false` |
+| `skills` | Skill whitelist for the subagent (`all`, or names resolved against user- and project-level skill directories) | none (isolation) |
 
 Frontmatter accepts both `tools: read, grep` and YAML block lists:
 
@@ -94,6 +95,7 @@ Quoted values and trailing `# comments` are handled. Definition mistakes fail
 loudly instead of silently changing behaviour:
 
 - `tools:` present but empty → error (it used to mean "all default tools")
+- `skills:` present but empty, or `all` mixed with concrete names → error
 - an unterminated quoted value → error
 - a `systemPrompt` value other than `replace` → error (omitting it still means append)
 - at creation time: an unregistered tool name, an unresolvable model, an
@@ -154,8 +156,10 @@ result (oversized replies are truncated at 30,000 characters with the full
 result written to a temp file).
 
 A subagent's prompt is deliberately bare: the definition body plus Pi's core
-rules — no skills, themes, or prompt templates, and no Pi documentation pointer.
-If a task needs that knowledge, pass it in the task text.
+rules — no themes or prompt templates, and no Pi documentation pointer. Skills
+load only if the definition whitelists them via `skills:` (see
+[Skills](#skills)); otherwise the prompt stays skill-free. If a task needs
+that knowledge, pass it in the task text.
 
 ### Fan-out
 
@@ -222,10 +226,31 @@ does inherit:
 - **Project context files** (`AGENTS.md` and the like) from the working
   directory. A subagent working in this repository follows this repository's
   rules; the cost is that every subagent turn pays for that file. Keep it lean.
-- Nothing else: the host's conversation history, skill index, prompt templates,
-  themes, discovered extensions, and Pi's own docs block are all withheld
-  (skills and prompts are the host's private inventory; the docs block is simply
-  never useful to a subagent and costs 343 tokens per request).
+- Nothing else: the host's conversation history, prompt templates, themes,
+  discovered extensions, and Pi's own docs block are all withheld (prompts are
+  the host's private inventory; the docs block is simply never useful to a
+  subagent and costs 343 tokens per request). Skills cross only through a
+  definition's explicit `skills` whitelist.
+
+### Skills
+
+A definition can load skills into its subagent's session — the skill index
+enters the nested prompt and the subagent reads `SKILL.md` files on demand:
+
+```markdown
+---
+description: Reviews code changes
+skills: code-review, tdd   # or `skills: all`
+---
+```
+
+- `skills: all` allows every user-level (`~/.pi/skills`) and project-level
+  (`.pi/skills`) skill, including ones added later.
+- A list narrows to the named skills; a name that resolves nowhere is silently
+  absent (same leniency as a `tools` whitelist).
+- Omitting `skills` keeps the subagent skill-free — the default is isolation.
+- Ad-hoc (inline) delegations never load skills: only a written definition can
+  grant them.
 
 ### Controlled recursion
 
@@ -265,9 +290,9 @@ review-then-fix pipeline, for example:
 - A chain is strictly sequential, so the fan-out cap does not apply.
 
 Delegation is one level deep by default: the `task` tool is never available to
-subagents themselves. Nested sessions also load no extensions, skills, prompt
+subagents themselves. Nested sessions also load no extensions, prompt
 templates, or themes, so a subagent's prompt is its definition plus the task —
-never the host's skill index.
+plus the skill index only when the definition's `skills` field grants it.
 
 ## Run directly
 

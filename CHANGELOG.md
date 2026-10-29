@@ -4,6 +4,29 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Definitions can whitelist skills for their subagents.** A new `skills`
+  frontmatter field (`all`, or a comma/YAML list of names) opens the one
+  gated exception in the isolation contract: with it, the nested session loads
+  Pi's own skill discovery (user-level `~/.pi/skills` plus project-level
+  `.pi/skills`) and a name list narrows the index to the whitelist. Omitting
+  the field keeps the previous behaviour exactly — no skill index, zero
+  tokens. Names that resolve nowhere are silently absent, the same leniency a
+  `tools` whitelist gets; an empty `skills:` key or `all` mixed with names is
+  a loud parse error like `tools:`. Ad-hoc (inline) delegations never load
+  skills: only a written definition can grant them. `create_subagent` gains a
+  matching optional `skills` parameter (`["all"]` is the wildcard).
+
+### Measured
+
+- Hermetic: 164 tests (7 new: opt-in index, whitelist narrowing, silent
+  absence, ad-hoc stays skill-free, three parsing-rule cases), `tsc` clean.
+  The `create_subagent` schema budget moved 210→240 tokens (and the combined
+  host surface 1,020→1,045) for the real field; no description fat added.
+
 ## [0.1.10] — 2026-10-26
 
 The run ledger stops being a number in memory and becomes a fold over pi's own

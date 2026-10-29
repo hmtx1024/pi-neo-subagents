@@ -109,6 +109,82 @@ it("reports an error when tools is present but empty", async () => {
 	}
 });
 
+it("accepts skills as a comma list and as the all wildcard", async () => {
+	const { session, ui, cwd, dispose } = await createTestSession();
+	try {
+		writeAgent(cwd, "skilled.md", [
+			"---",
+			"description: Uses two skills",
+			"skills: code-review, tdd",
+			"---",
+			"",
+			"Body.",
+			"",
+		]);
+		writeAgent(cwd, "wildcard.md", ["---", "description: Uses every skill", "skills: all", "---", "", "Body.", ""]);
+
+		await session.prompt("/subagents");
+
+		const errors = ui.notifications.filter((notification) => notification.type === "error");
+		expect(errors).toHaveLength(0);
+		const listing = userOutput(ui);
+		expect(listing).toContain("skilled");
+		expect(listing).toContain("wildcard");
+
+		await session.prompt("/subagents skilled");
+		const detail = userOutput(ui);
+		expect(detail).toContain("Skills: code-review, tdd");
+	} finally {
+		dispose();
+	}
+});
+
+it("reports an error when skills is present but empty", async () => {
+	const { session, ui, cwd, dispose } = await createTestSession();
+	try {
+		writeAgent(cwd, "empty-skills.md", ["---", "description: Empty skills key", "skills:", "---", "", "Body.", ""]);
+
+		await session.prompt("/subagents");
+
+		const errors = ui.notifications
+			.filter((notification) => notification.type === "error")
+			.map((notification) => notification.message)
+			.join("\n");
+		expect(errors).toContain("empty-skills.md");
+		expect(errors).toMatch(/skills/);
+		expect(userOutput(ui)).not.toContain("- empty-skills —");
+	} finally {
+		dispose();
+	}
+});
+
+it("reports an error when skills mixes all with concrete names", async () => {
+	const { session, ui, cwd, dispose } = await createTestSession();
+	try {
+		writeAgent(cwd, "mixed-skills.md", [
+			"---",
+			"description: all plus a name",
+			"skills: all, code-review",
+			"---",
+			"",
+			"Body.",
+			"",
+		]);
+
+		await session.prompt("/subagents");
+
+		const errors = ui.notifications
+			.filter((notification) => notification.type === "error")
+			.map((notification) => notification.message)
+			.join("\n");
+		expect(errors).toContain("mixed-skills.md");
+		expect(errors).toMatch(/not both/);
+		expect(userOutput(ui)).not.toContain("- mixed-skills —");
+	} finally {
+		dispose();
+	}
+});
+
 it("reports a duplicate agent name instead of listing both definitions", async () => {
 	const { session, ui, cwd, dispose } = await createTestSession();
 	try {

@@ -309,6 +309,7 @@ export async function handleSubagentsCommand(
 		}
 		const tools = agent.tools?.join(", ") ?? "all default";
 		const model = agent.model ?? "inherit";
+		const skills = agent.skills === undefined ? "none" : agent.skills === "all" ? "all" : agent.skills.join(", ");
 		const origin = agent.overridesUser ? "project, overrides user definition" : agent.source;
 		present(
 			ctx,
@@ -318,6 +319,7 @@ export async function handleSubagentsCommand(
 				`Description: ${agent.description}`,
 				`Tools: ${tools}`,
 				`Model: ${model}`,
+				`Skills: ${skills}`,
 				"",
 				agent.body.trim(),
 			].join("\n"),

@@ -102,8 +102,10 @@ it("keeps create_subagent's schema lean", async () => {
 	const create = toolSize(tools, "create_subagent");
 
 	expect(create.desc).toBeLessThanOrEqual(70);
-	expect(create.params).toBeLessThanOrEqual(210);
-	for (const field of ["name", "description", "instructions", "tools", "model", "scope", "overwrite"]) {
+	// 210 → 240: the `skills` whitelist field (ticket: subagent skill access)
+	// costs ~30 tokens of real schema; no description fat was added.
+	expect(create.params).toBeLessThanOrEqual(240);
+	for (const field of ["name", "description", "instructions", "tools", "model", "skills", "scope", "overwrite"]) {
 		expect(create.json, `field ${field} vanished from create params`).toContain(`"${field}"`);
 	}
 	expect(create.description).toMatch(/create|definition/i);
@@ -120,7 +122,8 @@ it("keeps the combined host tool surface under budget", async () => {
 		toolSize(tools, "create_subagent").params;
 
 	// Baseline 1,495 → target ≤1,020 (−32%); stretch ≤897 (−40%).
-	expect(total).toBeLessThanOrEqual(1020);
+	// 1,020 → 1,045 with the `skills` field above; every other trim intact.
+	expect(total).toBeLessThanOrEqual(1045);
 	dispose();
 });
 
