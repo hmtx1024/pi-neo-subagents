@@ -22,12 +22,14 @@ single create/validate path both creation surfaces go through.
   — discovery and creation never disagree.
 - **Two validation regimes, deliberately.** Creation and edit-time are strict:
   an unknown tool name, an unresolvable model, an invalid budget, a
-  `systemPrompt` value other than `replace`, an empty `tools:` list, a
-  duplicate name within one directory, or malformed frontmatter (e.g. an
-  unterminated quote) is a loud, file-specific error — no silent fallback ever
-  changes meaning. Discovery stays lenient only about *tool availability*: a
-  definition may legitimately name a tool a given session lacks, so a bad
-  whitelist fails the delegation that uses it, not the listing.
+  `systemPrompt` value other than `replace`, an empty `tools:` or `skills:`
+  list, `skills: all` mixed with concrete names, a duplicate name within one
+  directory, or malformed frontmatter (e.g. an unterminated quote) is a loud,
+  file-specific error — no silent fallback ever changes meaning. Discovery
+  stays lenient about *availability*: a definition may legitimately name a
+  tool a given session lacks or a skill that resolves nowhere, so a bad
+  whitelist fails or degrades only the delegation that uses it, not the
+  listing.
 - **Budget and thinking parsing** (`limits.ts`) is shared policy: one notion
   of a valid positive-integer budget and one list of thinking levels (matching
   Pi's session levels), built on the `validate.ts` leaf. Each caller keeps its
@@ -37,7 +39,8 @@ single create/validate path both creation surfaces go through.
   lists; `name` defaults to the file stem; the Markdown body is the agent's
   instructions; the field set is `name`, `description`, `tools`, `model`,
   `systemPrompt`, `maxTurns`, `timeoutMs`, `maxTokens`, `thinking`,
-  `allowSubagents`.
+  `allowSubagents`, `skills` (`all` or a name whitelist — the delegation
+  side decides what that means for the nested session's skill index).
 - The shared creation path validates *before* writing and refuses to replace
   an existing definition without an explicit flag; a definition written by
   either surface is delegable immediately in the same session.

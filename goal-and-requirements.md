@@ -44,8 +44,9 @@ What the product does today:
    directory; wins name collisions, labelled in listings) and user-level
    `~/.pi/agent/agents/`. Fields: name, description, tools whitelist, model
    pin, `systemPrompt` replace/append, `maxTurns`, `timeoutMs`, `maxTokens`,
-   `thinking`, `allowSubagents`. Definition mistakes fail loudly with
-   file-specific errors — no silent fallbacks.
+   `thinking`, `allowSubagents`, and `skills` (an opt-in whitelist of skill
+   names, or `all`; omitted means the subagent loads none). Definition
+   mistakes fail loudly with file-specific errors — no silent fallbacks.
 2. **Delegation** — a `task` tool the main agent calls in three exclusive
    shapes: a single task, a parallel fan-out (bounded concurrency, results in
    submission order, partial failure is normal), or an ordered chain with a
@@ -53,7 +54,10 @@ What the product does today:
    optional tools/model/budgets) without writing a definition file.
 3. **Isolation** — a nested session receives only the task text and the
    definition, plus the project's context files: never the host conversation,
-   skills, prompt templates, themes, discovered extensions, or Pi's docs.
+   prompt templates, themes, discovered extensions, or Pi's docs. Skills are
+   the one gated exception: a definition that declares `skills` loads exactly
+   those (or all, with `skills: all`); every other delegation — including all
+   ad-hoc entries — stays skill-free.
 4. **Budgets** — turns, wall-clock time, and tokens per definition or per
    call, with safety-net defaults. Exceeding one is a first-class outcome: the
    partial reply comes back marked with the budget that tripped — never as a

@@ -22,12 +22,16 @@ and the direct-run path are thin wrappers over this.
   factory with the provider mirrored from the host, so auth and streaming
   behave identically (rationale: `goal`, Principles). It executes the
   isolation contract stated in `architecture`: only the task text, the
-  definition, and the project's context files cross. Two details worth
-  knowing here: the nested factory registers a **reduced `task` tool** —
-  single-shape only (named agent + task + budgets; no fan-out, chain, or
-  ad-hoc below the top level) and only when the definition opted in via
-  `allowSubagents` — and it actively strips Pi's docs block from the nested
-  system prompt.
+  definition, and the project's context files cross. Skills are the gated
+  exception: a definition's `skills` field flips the resource loader from
+  "no skills" to Pi's own discovery (user- plus project-level directories),
+  with a name list narrowing the index — a name that resolves nowhere is
+  silently absent, and a definition without the field loads none. Three
+  details worth knowing here: the nested factory registers a **reduced
+  `task` tool** — single-shape only (named agent + task + budgets; no
+  fan-out, chain, or ad-hoc below the top level) and only when the definition
+  opted in via `allowSubagents` — and it actively strips Pi's docs block from
+  the nested system prompt.
 - **Budgets** are enforced here: turns and tokens at each turn boundary, a
   wall-clock timer that aborts the run. Precedence is per-call value >
   definition value > settings safety-net default (0 = no cap). Hitting a cap

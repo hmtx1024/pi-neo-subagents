@@ -85,12 +85,14 @@ extension API except through the parameters it is handed.
 
 - **Isolation contract** (executed by `delegation-core`): a nested session
   receives only the task text and the definition, plus the project's context
-  files from the working directory — never host history, skills, prompt
-  templates, themes, discovered extensions, or Pi's docs. `task` and
-  `create_subagent` never cross into a nested session; recursion exists only
-  through a definition's `allowSubagents` opt-in under the `maxDepth` limit,
-  and ad-hoc entries never receive `task` at all. See `goal` (Principles) and
-  `delegation-core`.
+  files from the working directory — never host history, prompt templates,
+  themes, discovered extensions, or Pi's docs. Skills are the one opt-in
+  exception: a definition's `skills` field (a name whitelist, or `all`) is
+  the only way skill access crosses, and ad-hoc entries never receive it.
+  `task` and `create_subagent` never cross into a nested session; recursion
+  exists only through a definition's `allowSubagents` opt-in under the
+  `maxDepth` limit, and ad-hoc entries never receive `task` at all. See
+  `goal` (Principles) and `delegation-core`.
 - **Outcome taxonomy**: `ok | budget-stop | failed | skipped`. A budget stop
   is not a failure — it carries the partial reply and names the budget that
   tripped (`isError` stays false); `skipped` exists only for chain steps that
