@@ -4,6 +4,11 @@
 
 **English** · [简体中文](README.zh-CN.md)
 
+> [!WARNING]
+> This project is a personal, experimental "Vibe Coding" test project. Some
+> features may be incomplete and bugs may exist — use it in production with
+> caution, or don't use it in production at all.
+
 Subagents for [Pi](https://github.com/earendil-works/pi): define named specialist
 agents as Markdown files, then let the main agent delegate self-contained tasks
 to them — or run them yourself. Each delegation runs in an isolated nested
