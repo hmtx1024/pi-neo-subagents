@@ -6,8 +6,10 @@
  * Isolation contract: the nested session receives only the task text and the
  * agent definition, never host conversation history. No extensions load in the
  * nested session (the `task` tool cannot recurse, and host extensions cannot
- * leak in). The model provider is mirrored from the host so auth and streaming
- * behaviour stay identical.
+ * leak in). Skills load only when a definition explicitly whitelists them via
+ * its `skills` field; otherwise the nested session stays skill-free. The model
+ * provider is mirrored from the host so auth and streaming behaviour stay
+ * identical.
  */
 
 import {
@@ -123,18 +125,33 @@ export async function runSubagent(options: RunSubagentOptions): Promise<Subagent
 			: options.bridges;
 
 	const replacePrompt = options.agent.systemPrompt === "replace";
+	// Skill access is an explicit opt-in per definition (`skills` frontmatter).
+	// Omitted keeps the isolation contract exactly as before — no skill index.
+	// With it, Pi's own discovery (user-level `agentDir/skills` + project-level
+	// `.pi/skills`) does the loading; a name list narrows the index via
+	// `skillsOverride`, and a name that resolves nowhere is simply absent.
+	const skills = options.agent.skills;
 	const resourceLoader = new DefaultResourceLoader({
 		cwd: options.cwd,
 		agentDir: getAgentDir(),
 		// A subagent sees its task and definition plus the PROJECT's context files
 		// (AGENTS.md and friends): working here means following this repository's
-		// rules. Host-PRIVATE resources stay out — no extension loading, no skill
-		// index, no prompt templates, no themes. Pi's own `docs` block is dropped
-		// by the session extension below (343 tokens per request).
+		// rules. Host-PRIVATE resources stay out — no extension loading, no prompt
+		// templates, no themes, and no skills unless the definition asked for them.
+		// Pi's own `docs` block is dropped by the session extension below (343
+		// tokens per request).
 		noExtensions: true,
-		noSkills: true,
+		noSkills: skills === undefined,
 		noPromptTemplates: true,
 		noThemes: true,
+		...(skills !== undefined && skills !== "all"
+			? {
+					skillsOverride: (base) => ({
+						skills: base.skills.filter((skill) => skills.includes(skill.name)),
+						diagnostics: base.diagnostics,
+					}),
+				}
+			: {}),
 		extensionFactories: [createSubagentSessionExtension(options)],
 		...(replacePrompt
 			? {

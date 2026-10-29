@@ -36,6 +36,11 @@ export interface AgentDefinition {
 	thinking?: DefinitionThinking;
 	/** Whether this agent may spawn subagents of its own (default: no). */
 	allowSubagents?: boolean;
+	/** Skill whitelist for the nested session (frontmatter `skills`): `all`, or a
+	 * list of skill names resolved against the user- and project-level skill
+	 * directories. Omitted means zero skills (the isolation contract); names that
+	 * do not resolve are silently absent. */
+	skills?: "all" | string[];
 	/** Markdown body: the agent's specialization instructions. */
 	body: string;
 	/** Which resource directory the definition came from. */
@@ -203,6 +208,27 @@ export function parseAgentText(raw: string, file: string, source: "project" | "u
 		};
 	}
 
+	// `skills` widens what a nested session may load, so its shape is strict
+	// (empty, `all` mixed with names, or a scalar list is a loud error) while its
+	// *existence* stays lenient: a name that resolves nowhere is silently absent,
+	// the same stance discovery takes on tool availability.
+	let skills: "all" | string[] | undefined;
+	if (frontmatter.skills !== undefined) {
+		const raw = frontmatter.skills;
+		const items = (Array.isArray(raw) ? raw : raw.split(",")).map((item) => item.trim()).filter(Boolean);
+		if (items.length === 0) {
+			return { ok: false, error: { file, message: '"skills" must be "all" or a non-empty list of skill names' } };
+		}
+		if (items.includes("all")) {
+			if (items.length > 1) {
+				return { ok: false, error: { file, message: '"skills" is either "all" or a list of names, not both' } };
+			}
+			skills = "all";
+		} else {
+			skills = items;
+		}
+	}
+
 	let allowSubagents: boolean | undefined;
 	if (frontmatter.allowSubagents !== undefined) {
 		const raw = frontmatter.allowSubagents as string;
@@ -237,6 +263,7 @@ export function parseAgentText(raw: string, file: string, source: "project" | "u
 			...limits,
 			...(thinking ? { thinking } : {}),
 			...(allowSubagents === undefined ? {} : { allowSubagents }),
+			...(skills === undefined ? {} : { skills }),
 			body,
 			source,
 			overridesUser: false,
@@ -361,6 +388,7 @@ export interface CreateDefinitionRequest {
 	maxTokens?: number;
 	timeoutMs?: number;
 	thinking?: DefinitionThinking;
+	skills?: "all" | string[];
 	validation?: CreationValidation;
 	/** Defaults to "project": project definitions travel with the repository. */
 	scope?: AgentScope;
@@ -392,6 +420,7 @@ function renderAgentMarkdown(request: {
 	maxTokens?: number;
 	timeoutMs?: number;
 	thinking?: DefinitionThinking;
+	skills?: "all" | string[];
 }): string {
 	const frontmatter = [`name: ${request.name}`, `description: ${request.description}`];
 	if (request.tools && request.tools.length > 0) {
@@ -404,6 +433,9 @@ function renderAgentMarkdown(request: {
 	if (request.maxTokens !== undefined) frontmatter.push(`maxTokens: ${request.maxTokens}`);
 	if (request.timeoutMs !== undefined) frontmatter.push(`timeoutMs: ${request.timeoutMs}`);
 	if (request.thinking) frontmatter.push(`thinking: ${request.thinking}`);
+	if (request.skills) {
+		frontmatter.push(`skills: ${request.skills === "all" ? "all" : request.skills.join(", ")}`);
+	}
 	return ["---", ...frontmatter, "---", "", request.instructions.trim(), ""].join("\n");
 }
 
@@ -440,6 +472,15 @@ export function createAgentDefinition(request: CreateDefinitionRequest): CreateD
 			ok: false,
 			error: `"thinking" must be one of: ${THINKING_LEVELS.join(", ")} (got "${request.thinking}").`,
 		};
+	}
+	if (request.skills !== undefined) {
+		if (request.skills === "all") {
+			// "all" needs no name validation.
+		} else if (request.skills.length === 0) {
+			return { ok: false, error: '"skills" must be "all" or a non-empty list of skill names.' };
+		} else if (request.skills.includes("all")) {
+			return { ok: false, error: '"skills" is either "all" or a list of names, not both.' };
+		}
 	}
 
 	const availableTools = request.validation?.availableTools;
@@ -491,6 +532,7 @@ export function createAgentDefinition(request: CreateDefinitionRequest): CreateD
 		maxTokens: request.maxTokens,
 		timeoutMs: request.timeoutMs,
 		thinking: request.thinking,
+		skills: request.skills,
 	});
 	const parsed = parseAgentText(rendered, file, scope);
 	if (!parsed.ok) {

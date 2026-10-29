@@ -19,6 +19,11 @@ export const createSubagentParameters = Type.Object({
 	description: Type.String({ description: "when to delegate" }),
 	instructions: Type.String({ description: "markdown body" }),
 	tools: Type.Optional(Type.Array(Type.String(), { description: "built-ins + host extensions; a list narrows" })),
+	skills: Type.Optional(
+		Type.Array(Type.String(), {
+			description: 'skill whitelist; ["all"] = every user/project skill',
+		}),
+	),
 	model: Type.Optional(Type.String({ description: "provider/id" })),
 	maxTurns: Type.Optional(Type.Number({ description: "turn cap" })),
 	maxTokens: Type.Optional(Type.Number({ description: "token cap" })),
@@ -36,6 +41,15 @@ export interface CreateSubagentDetails {
 	name: string;
 	path: string;
 	scope: "project" | "user";
+}
+
+/** `["all"]` is the wildcard; anything else is a name whitelist. Validation of
+ * the shape (empty, `all` mixed with names) lives in `createAgentDefinition`. */
+function normalizeSkillsParam(skills: string[] | undefined): "all" | string[] | undefined {
+	if (skills === undefined) return undefined;
+	const trimmed = skills.map((skill) => skill.trim()).filter(Boolean);
+	if (trimmed.length === 1 && trimmed[0] === "all") return "all";
+	return trimmed;
 }
 
 /**
@@ -75,6 +89,7 @@ export function createCreateSubagentTool(getSettings: () => SubagentSettings) {
 				description: params.description,
 				instructions: params.instructions,
 				tools: params.tools,
+				skills: normalizeSkillsParam(params.skills),
 				model: params.model,
 				maxTurns: params.maxTurns,
 				maxTokens: params.maxTokens,
