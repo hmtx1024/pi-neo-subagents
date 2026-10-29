@@ -1,8 +1,19 @@
+---
+id: spec-v1
+type: goal-and-requirements
+status: done
+title: "Spec: pi-neo-subagents — Subagents Plugin for Pi (v1, as shipped)"
+parent: goal
+references: [spec-v2]
+---
+
 # Spec: pi-neo-subagents — Subagents Plugin for Pi
 
 Status: delivered (v1 shipped; tickets 01–09)
 Scope source: the design tree agreed in the grilling session (Q1–Q13, all settled).
 Successor: `docs/specs/subagents-v2.md` (parallelism, budgets, managed definitions).
+Living record: `goal-and-requirements.md` (repo root) — the sections below describe v1 as shipped,
+including its then-scope; current behaviour lives in the spec graph (corrections are marked inline).
 
 ## Problem Statement
 
@@ -74,7 +85,7 @@ In v1, delegation is serial and one level deep: results come back as tool result
 
 **Form and distribution.** The extension is a standard extension directory with a package manifest and a single TypeScript entry point, loaded by Pi's `jiti`-based extension runtime without a build step. The layout is organized for later publication as a Pi package, but v1 ships as a loadable extension directory.
 
-**Execution mechanism.** Each `task` invocation spawns a nested, in-process agent session via the Pi SDK's session factory, with an in-memory session manager (no session files) and shared model configuration/credentials from the host. The nested session is disposed at the end of every task. Cancellation flows from the tool execution's abort signal into the nested session's abort. Progress is reported through the tool's update callback at coarse granularity (per turn), never as a stream.
+**Execution mechanism.** Each `task` invocation spawns a nested, in-process agent session via the Pi SDK's session factory, with an in-memory session manager (no session files) and shared model configuration/credentials from the host. *(Corrected during spec-graph import: since 0.1.10 the nested session writes a child session file when the host session persists — persistence follows the host; see `goal`, Principles.)* The nested session is disposed at the end of every task. Cancellation flows from the tool execution's abort signal into the nested session's abort. Progress is reported through the tool's update callback at coarse granularity (per turn), never as a stream.
 
 **Agent definitions.** Definitions are Markdown files with YAML frontmatter in two resource directories: project-level (`.pi/agents/`, relative to the working directory) and user-level (`~/.pi/agent/agents/`). Frontmatter fields:
 
@@ -92,7 +103,7 @@ System prompt composition: by default the subagent receives Pi's complete defaul
 
 **Trigger surfaces.** Three entry points: (1) the model-callable `task` tool, whose description is dynamically regenerated to enumerate all discovered agents (name + description) plus delegation guidance, kept in sync with definition changes; (2) `/subagents` listing and `/subagents <name>` detail; (3) `/subagents run <name> <task>` direct execution, whose output is shown to the user and excluded from model context by default, with a run option that instead sends the result into the model's context where the main agent can continue from it. All user entry points live under the single `/subagents` command.
 
-**Isolation contract.** A subagent receives only the task text. No host conversation history, images, or session state cross the boundary. Task descriptions must be self-contained; making them so is the caller's responsibility.
+**Isolation contract.** A subagent receives only the task text. No host conversation history, images, or session state cross the boundary. Task descriptions must be self-contained; making them so is the caller's responsibility. *(Corrected during spec-graph import: a subagent also inherits the project's context files — e.g. `AGENTS.md` — from the working directory; what never crosses is the host's private context: conversation, skills, prompt templates, themes, discovered extensions, Pi's docs. See `architecture`.)*
 
 **Result contract.** The `task` tool result contains the subagent's final reply text in model-facing content. Beyond 30,000 characters the content is truncated with an explicit notice and the complete result written to a temporary file (OS temp directory) whose path is included in the notice. Structured details carry turn count, token usage, model, task text, and duration, persisted with the tool result for later rendering. Nested usage is merged into the result's usage per Pi's nested-call convention so session totals remain accurate. Failures surface as error tool results carrying the underlying error text.
 
@@ -109,6 +120,12 @@ System prompt composition: by default the subagent receives Pi's complete defaul
 **Framework and prior art.** Vitest in a Node environment running the Pi SDK. The repository has no existing tests (greenfield); the Pi repository's SDK session examples are the reference shape for driving a full in-memory session programmatically. Tests must run offline and hermetically.
 
 ## Out of Scope
+
+> Adopted into the spec graph with a correction: these are v1 scope limits, not current
+> exclusions. Parallel dispatch, controlled recursion (opt-in, depth-bounded), and ad-hoc
+> delegation have since shipped (`spec-v2`); nested-session transcripts are now saved as child
+> sessions, with first-class resume/fork recorded as a non-goal in `goal`. The remaining items
+> below were v1 decisions and still hold.
 
 - Parallel dispatch of multiple subagents in one tool call.
 - Recursive delegation (subagents spawning subagents); the `task` tool is withheld from subagents.

@@ -1,8 +1,18 @@
+---
+id: spec-v2
+type: goal-and-requirements
+status: done
+title: "Spec: pi-neo-subagents v2 — Parallelism, Budgets, and Managed Definitions"
+parent: goal
+references: [spec-v1]
+---
+
 # Spec: pi-neo-subagents v2 — Parallelism, Budgets, and Managed Definitions
 
 Status: delivered (tickets 01–12)
 Tickets: `.scratch/pi-neo-subagents-v2/issues/` (01–12, numbered in dependency order)
 Scope source: v1 has shipped (spec `docs/specs/subagents.md`, tickets 01–09). v2 scope is derived from the v1 live-test report (`.scratch/pi-neo-subagents/manual-test-report.md`), the deferred items listed in v1's "Out of Scope", and the v2 plan review.
+Living record: `goal-and-requirements.md` (repo root) — corrections for post-v2 changes (0.1.10) are marked inline below.
 
 ## Problem Statement
 
@@ -105,7 +115,7 @@ v2 turns delegation from "works" into "governed".
 
 **Definition management.** `/subagents new`, `/subagents edit`, and `/subagents rm` use one creation/validation path shared with `create_subagent`; `new` prompts for name and description when omitted, `edit` opens the resolved file, `rm` asks for confirmation. Creation refuses to overwrite without an explicit flag, and validation runs before any write, as in v1.
 
-**Authorization.** Before the first use of a project-level agent in a session, a confirmation is requested when a dialog-capable UI exists; the answer is remembered per session per agent. Settings: `confirmProjectAgents` (default on), `allowModelCreatedDefinitions` (default on), `allowUserScopeCreation` (default off), `maxDepth` (default 2). In modes without a UI, confirmation is treated as denied only when `confirmProjectAgents` is explicitly configured to deny-without-UI; the default is to proceed and record a warning in the tool result, so automation never blocks. (This is the one behaviour that must be written down explicitly because it differs between interactive and scripted use.)
+**Authorization.** Before the first use of a project-level agent in a session, a confirmation is requested when a dialog-capable UI exists; the answer is remembered per session per agent. Settings: `confirmProjectAgents` (default on), `allowModelCreatedDefinitions` (default on), `allowUserScopeCreation` (default off), `maxDepth` (default 2). In modes without a UI, confirmation is treated as denied only when `confirmProjectAgents` is explicitly configured to deny-without-UI; the default is to proceed so automation never blocks. *(Corrected during spec-graph import: no warning is actually recorded — the answer is silently remembered like a UI confirmation; the code has no warning path.)* (This is the one behaviour that must be written down explicitly because it differs between interactive and scripted use.)
 
 **Strict validation.** `systemPrompt` accepts only `replace`; an unknown or unavailable `model` fails at creation; `tools` entries must match a currently registered tool name at creation time (warn-free hard error) while discovery stays lenient, because a definition may legitimately be used in a session that lacks an optional tool.
 
@@ -113,7 +123,7 @@ v2 turns delegation from "works" into "governed".
 
 **Discovery.** Project discovery walks up from the working directory to the nearest directory containing `.pi/agents`, stopping at the filesystem root. Creation writes into that same directory, or creates `<cwd>/.pi/agents` when no ancestor has one. User-level discovery is unchanged.
 
-**Run ledger.** In-memory per session: `{ agent, depth, runs, failures, budgetStops, turns, inputTokens, outputTokens, cost, totalDurationMs }`. Updated from delegation outcomes (which already carry usage and duration). `/subagents stats` renders a table; `/subagents stats reset` clears it. Not persisted across sessions (see Out of Scope).
+**Run ledger.** In-memory per session: `{ agent, depth, runs, failures, budgetStops, turns, inputTokens, outputTokens, cost, totalDurationMs }`. Updated from delegation outcomes (which already carry usage and duration). `/subagents stats` renders a table; `/subagents stats reset` appends a tombstone. *(Corrected during spec-graph import, 0.1.10: the ledger is now a fold over pi's session log — one raw record per delegation, replayed on `session_start` — so stats survive a resume; the in-memory ledger is the view. See `ledger`.)*
 
 **TUI rendering.** A widget keyed per dispatch shows the agent name, current turn, and current tool for in-flight subagents, updated from the existing progress callback and tool-event subscription; it is cleared when the dispatch settles. Guarded by TUI mode; a no-op elsewhere.
 
@@ -143,9 +153,9 @@ Prior art: the v1 suites (`inventory`, `task-tool`, `result-contract`, `definiti
 
 ## Out of Scope
 
-- Publishing to npm and the Pi package gallery (manifest already conforms; release mechanics are separate).
+- Publishing to npm and the Pi package gallery (manifest already conforms; release mechanics are separate). *(Corrected during spec-graph import: the package has been published to npm since 0.1.x; release mechanics live in `RELEASING.md`.)*
 - `/subagents lint` and a bundled library of example agents.
-- Persisting, resuming, or forking nested subagent sessions; the ledger is in-memory only.
+- Persisting, resuming, or forking nested subagent sessions; the ledger is in-memory only. *(Corrected during spec-graph import, 0.1.10: a delegation's transcript is now saved as a child session when the host session persists, and the ledger folds the session log across a resume. What remains excluded is first-class resume/fork of nested sessions — recorded in `goal`, Non-goals.)*
 - Model pools, automatic cost routing, and per-task model selection policies.
 - Cross-machine or cross-repository synchronization of definitions.
 - Any GitHub / issue-tracker publishing workflow.
